@@ -35,12 +35,30 @@ def _parser() -> argparse.ArgumentParser:
 
     demo = sub.add_parser("demo", help="Run the deterministic three-minute demo")
     demo.add_argument("--output-dir", default="evidence/demo")
+
+    serve = sub.add_parser("serve", help="Serve the read-only HTTP API")
+    serve.add_argument("--host")
+    serve.add_argument("--port", type=int)
+    serve.add_argument(
+        "--allow-unauthenticated",
+        action="store_true",
+        help="Allow API access without HEALER_SERVER_TOKEN (trusted networks only)",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.command == "serve":
+            from .server import serve
+
+            serve(
+                host=args.host,
+                port=args.port,
+                allow_unauthenticated=args.allow_unauthenticated,
+            )
+            return 0
         if args.command == "demo":
             payload = run_demo(args.output_dir)
         else:

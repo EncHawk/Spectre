@@ -7,15 +7,12 @@ from typing import Any
 from ..errors import ConfigurationError
 from .anthropic import AnthropicProvider
 from .base import Provider
-from .bedrock import BedrockProvider
 from .google import GoogleProvider
 from .groq import GroqProvider
 from .openai import OpenAIProvider
 
 _PROVIDERS: dict[str, type[Provider]] = {
     "anthropic": AnthropicProvider,
-    "bedrock": BedrockProvider,
-    "aws": BedrockProvider,
     "google": GoogleProvider,
     "gemini": GoogleProvider,
     "groq": GroqProvider,
@@ -61,8 +58,6 @@ def get_default_provider(*, required: bool = True) -> Provider | None:
     global _default
     if _default is None:
         name = os.getenv("HEALER_PROVIDER")
-        if not name and os.getenv("HEALER_BEDROCK_MODEL"):
-            name = "bedrock"
         if name:
             _default = create_provider(name)
     if _default is None and required:

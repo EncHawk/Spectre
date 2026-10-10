@@ -7,9 +7,8 @@ import subprocess
 from collections.abc import Callable, Iterable
 from pathlib import Path, PurePosixPath
 
-from .bedrock import extract_json
 from .causes import group_causes
-from .errors import ExternalToolError, UnsafePatchError
+from .errors import ExternalToolError, HealerError, UnsafePatchError
 from .models import Finding, FixProposal
 from .privacy import Redactor
 from .providers import Provider, get_default_provider
@@ -43,7 +42,7 @@ def propose_fix(
     prompt = _build_prompt(items, causes, Path(repo_path), allowed_files)
     try:
         completion = complete or (model or get_default_provider()).complete
-        response = extract_json(completion(prompt))
+        response = _extract_json(completion(prompt))
         diff = str(response.get("diff", ""))
         summary = str(response.get("summary", "Proposed fix"))
         files = validate_diff(diff, allowed_files)
@@ -69,6 +68,20 @@ def propose_fix(
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(Redactor().redact(proposal.to_dict()), indent=2) + "\n")
     return proposal
+
+
+def _extract_json(text: str) -> dict[str, object]:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.split("\n", 1)[1].rsplit("```", 1)[0]
+        stripped = stripped.removeprefix("json\n")
+    try:
+        value = json.loads(stripped)
+    except json.JSONDecodeError as exc:
+        raise HealerError("The model did not return the required JSON object.") from exc
+    if not isinstance(value, dict):
+        raise HealerError("The model returned JSON, but not an object.")
+    return value
 
 
 def validate_diff(diff: str, allowed_files: Iterable[str] | None = None) -> list[str]:

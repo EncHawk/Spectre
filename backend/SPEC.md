@@ -23,7 +23,7 @@ Going further (needs more access):
 
 1. Never make up results. Every number must come from a real run. If it isn't measured, write TBD.
 2. Never put keys in git or logs. Use env vars and a `.env.example`.
-3. Don't guess how neatlogs, Entire, Crustdata or Bedrock work. Read their docs first. If something isn't documented, note it in `hackathon.md` and use the fallback.
+3. Don't guess how neatlogs, Entire, Crustdata, or AWS deployment works. Read their docs first. If something isn't documented, note it in `hackathon.md` and use the fallback.
 4. The SDK must not depend on the demo agent.
 5. Read-only by default. Writing to git or opening PRs only happens when the user says so.
 6. All code is written during the hackathon. Commit often.
@@ -35,7 +35,8 @@ Going further (needs more access):
 
 - Python 3.12, pytest, a Makefile with `setup`, `test`, `demo`.
 - neatlogs for tracing (`pip install -U neatlogs`, `neatlogs.init()`).
-- Amazon Bedrock for the models Healer uses to analyze and fix. This is a separate credential from the neatlogs key.
+- OpenAI, Groq, Anthropic, or Google for the models Healer uses to analyze and fix. Provider credentials are separate from the neatlogs key.
+- A hardened Docker image and read-only HTTP API deployable to an Amazon Linux 2023 EC2 instance through ECR.
 - Folders: `src/healer/` (the SDK), `examples/research_agent/` (demo), `tests/`, `evidence/`, `business/`.
 
 ## Features
@@ -98,7 +99,8 @@ No sandbox infrastructure, no Composio/OAuth, no web UI, nothing that depends on
 - neatlogs: https://docs.neatlogs.com
 - Entire: https://docs.entire.io
 - Crustdata: https://docs.crustdata.com
-- Bedrock: https://docs.aws.amazon.com/bedrock/latest/userguide/what-is-bedrock.html
+- EC2 container image guide: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/create-container-image.html
+- ECR authentication: https://docs.aws.amazon.com/AmazonECR/latest/userguide/registry_auth.html
 - Hackathon rules: https://neatlogs.com/hackathon
 
 ## Evidence to keep in `evidence/`

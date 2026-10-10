@@ -1,6 +1,6 @@
 PYTHON ?= python3.12
 
-.PHONY: setup test demo lint
+.PHONY: setup test demo lint image
 
 setup:
 	$(PYTHON) -m venv .venv
@@ -14,3 +14,6 @@ lint:
 
 demo:
 	PYTHONPATH=src $(PYTHON) -m healer --json demo
+
+image:
+	docker build -t spectre-healer:local .

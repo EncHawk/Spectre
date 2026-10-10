@@ -55,7 +55,6 @@ pip install 'spectre-healer[openai]'
 pip install 'spectre-healer[groq]'
 pip install 'spectre-healer[anthropic]'
 pip install 'spectre-healer[google]'
-pip install 'spectre-healer[bedrock]'
 # or
 pip install 'spectre-healer[providers]'
 ```
@@ -66,7 +65,6 @@ pip install 'spectre-healer[providers]'
 | Groq | `groq` | `GROQ_API_KEY` | `GROQ_MODEL` |
 | Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL` |
 | Google Gemini | `google` or `gemini` | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `GOOGLE_MODEL` |
-| Amazon Bedrock | `bedrock` or `aws` | standard AWS credential chain | `HEALER_BEDROCK_MODEL` |
 
 `HEALER_MODEL` is a shared fallback when a provider-specific model variable is absent. Keys may also be supplied directly to `healer.init(provider_api_key=...)` or `healer.provider(api_key=...)`; they are kept off public objects, representations, errors, and persisted traces.
 
@@ -96,6 +94,23 @@ make demo
 ```
 
 The demo is deterministic and needs no live credentials. It traces a deliberately flawed research agent, finds a repeated tool call, groups the cause, generates a constrained patch, tests it against visible and sealed cases, and writes reports beneath `evidence/demo/`. Unknown costs and business values remain `TBD`.
+
+## Docker and EC2
+
+The production image runs a small read-only HTTP service on port `8080`. It installs all four provider adapters, runs as a non-root user, stores the local trace fallback under `/data`, and refuses protected API traffic unless `HEALER_SERVER_TOKEN` is configured.
+
+```bash
+docker build -t spectre-healer:local .
+docker run --rm -p 8080:8080 \
+  -e HEALER_SERVER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" \
+  -e HEALER_PROVIDER=openai \
+  -e HEALER_MODEL=gpt-5-mini \
+  -e OPENAI_API_KEY \
+  -v healer-data:/data \
+  spectre-healer:local
+```
+
+The public `/healthz` and `/readyz` routes are suitable for Docker and load-balancer health checks. Authenticated endpoints are `GET /v1/status` and `GET`/`POST /v1/scan`. See the complete [EC2 and ECR deployment guide](deploy/ec2/README.md) and hardened [Compose definition](deploy/ec2/compose.yaml).
 
 ## Credentials and capability detection
 
@@ -146,7 +161,7 @@ The SDK includes deterministic prompt variants, a model-family guard for attacke
 ## Sponsor adapters
 
 - Neatlogs: SDK instrumentation, Public API traces/span payloads, detection suggestions (read-only), cursor pagination, bounded retries.
-- OpenAI, Groq, Anthropic, Google Gemini, and Amazon Bedrock: official SDK adapters behind one redacted generation interface.
+- OpenAI, Groq, Anthropic, and Google Gemini: official SDK adapters behind one redacted generation interface.
 - Entire: existing CLI status and prior-session search. Entire is already enabled in this repository; approve the Codex hooks locally so commits receive checkpoints.
 - cfo.ai: measured rates and costs are written to `business/inputs.json`; pricing, revenue, runway, and scenarios stay `TBD` for the user to complete in cfo.ai.
 

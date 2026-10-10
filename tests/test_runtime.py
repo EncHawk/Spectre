@@ -3,7 +3,6 @@ import asyncio
 import pytest
 
 import healer
-from healer.bedrock import BedrockModel
 from healer.runtime import get_runtime, init_runtime, reset_runtime
 
 
@@ -58,20 +57,6 @@ def test_local_capability_message(tmp_path, monkeypatch):
     assert runtime.capability.local_fallback
     assert not runtime.capability.read_traces
     assert "NEATLOGS_TOKEN" in runtime.capability.read_detail
-
-
-def test_healers_bedrock_call_is_traced(tmp_path):
-    runtime = init_runtime(local_log=tmp_path / "runs.jsonl")
-
-    class Client:
-        def converse(self, **_):
-            return {"output": {"message": {"content": [{"text": "fixed"}]}}}
-
-    model = BedrockModel("amazon.nova-lite-v1:0", client=Client())
-    assert model.complete("repair this") == "fixed"
-    recorded = runtime.store.list("1h")
-    assert recorded[0].spans[0].kind == "LLM"
-    assert recorded[0].spans[0].name == "healer.bedrock"
 
 
 def test_agent_can_be_defined_before_init(tmp_path):
