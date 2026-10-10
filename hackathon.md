@@ -12,13 +12,15 @@ Built:
 - Redacted append-only local trace fallback and sync/async agent/tool decorators.
 - Eight deterministic checks covering repetition, loops, errors/recovery, empty answers, unsupported source-sensitive claims, missing lookup, and measured cost spikes.
 - Finding-to-regression-case conversion, cause grouping, sealed sets, adversarial variants, different-family attacker guard, fault injection, and tool replay.
-- Amazon Bedrock Converse adapter and a read-only-by-default unified-diff proposal workflow with file allowlists.
+- Provider-neutral generation adapters for the official OpenAI, Groq, Anthropic, Google Gen AI, and Amazon Bedrock SDKs; environment-key auth, token usage normalization, and traced/redacted model calls.
+- Runtime-lazy sync/async decorators, so an agent can be defined before `healer.init()` and follows later runtime initialization.
+- Read-only-by-default unified-diff proposal workflow with file allowlists and the configured provider as its default fixer.
 - Candidate validation with separate visible/hidden scores; explicit git apply and PR gates.
 - Neatlogs detection-suggestion reader/test harness, Entire status/search helpers, JSON/Markdown reports, and cfo.ai input generation.
 
 Verified locally:
 
-- 35 tests passed on Python 3.12.12.
+- 45 tests passed on Python 3.12.12, including provider adapters and pre-init decorators.
 - Ruff lint and formatting checks passed, and both a wheel and source distribution built successfully.
 - The packaged demo found 1 measured repeated-tool-call failure in 1 visible case.
 - The demo candidate moved visible success from 0/1 to 1/1.
@@ -30,7 +32,7 @@ External integration status:
 
 - Entire CLI 0.11.4 reports this repository enabled on `main` with Codex configured. Seven Codex hooks still require approval in the local UI; no claim is made that this session's commits have checkpoints until that approval occurs.
 - No Neatlogs credential was present during the local proof, so live ingest/read behavior is unverified. The SDK used the documented local fallback.
-- No Bedrock credential/model run was performed; the adapter follows the documented `converse` request shape, while the demo injects a deterministic proposal generator.
+- No live provider credential/model run was performed. Official SDK request shapes are covered with injected clients; the demo injects a deterministic proposal generator.
 - No Git remote is configured, so no PR was opened.
 - The hackathon skill URL returned an inaccessible response to the documentation client. The repository follows the build-log and evidence rules copied into `backend/SPEC.md`; anything unique to that remote skill remains unverified.
 

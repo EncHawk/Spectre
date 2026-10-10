@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -7,6 +8,7 @@ from healer.causes import group_causes
 from healer.errors import ConfigurationError, UnsafePatchError
 from healer.fixes import propose_fix, validate_diff
 from healer.models import Finding, Span, Trace
+from healer.providers import configure_default_provider, reset_default_provider
 from healer.regression import findings_to_cases, seal_cases, validate_candidate
 from healer.replay import Recorder, Replayer
 from healer.report import build_report, write_report
@@ -63,6 +65,34 @@ def test_propose_fix_with_injected_model(tmp_path):
     )
     assert proposal.status == "proposed"
     assert (tmp_path / ".healer" / "proposals" / f"{proposal.id}.json").exists()
+
+
+def test_propose_fix_uses_configured_default_provider(tmp_path):
+    diff = "diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n-x\n+y\n"
+
+    class Responses:
+        def create(self, **_):
+            return SimpleNamespace(
+                output_text=json.dumps({"summary": "provider fix", "diff": diff}),
+                usage=None,
+            )
+
+    configure_default_provider(
+        "openai",
+        model="gpt-test",
+        client=SimpleNamespace(responses=Responses()),
+    )
+    try:
+        proposal = propose_fix(
+            [finding()],
+            repo_path=tmp_path,
+            allowed_files=["a.py"],
+        )
+    finally:
+        reset_default_provider()
+
+    assert proposal.status == "proposed"
+    assert proposal.summary == "provider fix"
 
 
 def test_fault_injection_and_variants():

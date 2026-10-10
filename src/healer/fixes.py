@@ -7,11 +7,12 @@ import subprocess
 from collections.abc import Callable, Iterable
 from pathlib import Path, PurePosixPath
 
-from .bedrock import BedrockModel, extract_json
+from .bedrock import extract_json
 from .causes import group_causes
 from .errors import ExternalToolError, UnsafePatchError
 from .models import Finding, FixProposal
 from .privacy import Redactor
+from .providers import Provider, get_default_provider
 
 Completion = Callable[[str], str]
 _DIFF_FILE = re.compile(r"^\+\+\+ b/(.+)$", re.MULTILINE)
@@ -23,7 +24,7 @@ def propose_fix(
     repo_path: str | Path,
     allowed_files: Iterable[str] | None = None,
     complete: Completion | None = None,
-    model: BedrockModel | None = None,
+    model: Provider | None = None,
     write_proposal: bool = True,
 ) -> FixProposal:
     items = list(findings)
@@ -40,8 +41,8 @@ def propose_fix(
             reason="A fix proposal requires at least one measured finding.",
         )
     prompt = _build_prompt(items, causes, Path(repo_path), allowed_files)
-    completion = complete or (model or BedrockModel()).complete
     try:
+        completion = complete or (model or get_default_provider()).complete
         response = extract_json(completion(prompt))
         diff = str(response.get("diff", ""))
         summary = str(response.get("summary", "Proposed fix"))

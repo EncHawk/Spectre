@@ -13,8 +13,12 @@ def utc_now() -> str:
 class Capability:
     send_traces: bool = False
     read_traces: bool = False
+    model_generation: bool = False
     send_detail: str = "not configured"
     read_detail: str = "not configured"
+    model_detail: str = "not configured"
+    model_provider: str | None = None
+    model_name: str | None = None
     local_fallback: bool = True
 
     def to_dict(self) -> dict[str, Any]:

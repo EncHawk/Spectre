@@ -25,8 +25,6 @@ Instrument any agent and its tools:
 ```python
 import healer
 
-healer.init(workflow_name="support-agent")
-
 @healer.tool
 def lookup_order(order_id: str):
     return {"status": "shipped"}
@@ -34,9 +32,57 @@ def lookup_order(order_id: str):
 @healer.agent(tags=("production",))
 def support_agent(order_id: str):
     return lookup_order(order_id)
+
+# Initialization can happen after definitions. Decorators bind to the active
+# runtime on first use (and follow a later re-initialization).
+capabilities = healer.init(
+    workflow_name="support-agent",
+    provider="openai",
+    model="gpt-5-mini",
+)
+
+answer = support_agent("order-123")
 ```
 
 Both sync and async functions are supported. Inputs, outputs, and errors are redacted before the local fallback log is written.
+
+## Model providers
+
+Healer has a provider-neutral generation interface backed by each vendor's official Python SDK. Install only what you use, or install all adapters together:
+
+```bash
+pip install 'spectre-healer[openai]'
+pip install 'spectre-healer[groq]'
+pip install 'spectre-healer[anthropic]'
+pip install 'spectre-healer[google]'
+pip install 'spectre-healer[bedrock]'
+# or
+pip install 'spectre-healer[providers]'
+```
+
+| Provider | `HEALER_PROVIDER` | API key | Model variable |
+| --- | --- | --- | --- |
+| OpenAI | `openai` | `OPENAI_API_KEY` | `OPENAI_MODEL` |
+| Groq | `groq` | `GROQ_API_KEY` | `GROQ_MODEL` |
+| Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL` |
+| Google Gemini | `google` or `gemini` | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `GOOGLE_MODEL` |
+| Amazon Bedrock | `bedrock` or `aws` | standard AWS credential chain | `HEALER_BEDROCK_MODEL` |
+
+`HEALER_MODEL` is a shared fallback when a provider-specific model variable is absent. Keys may also be supplied directly to `healer.init(provider_api_key=...)` or `healer.provider(api_key=...)`; they are kept off public objects, representations, errors, and persisted traces.
+
+```python
+import healer
+
+# Process-wide default used by healer.propose_fix(...)
+healer.init(provider="anthropic", model="claude-sonnet-4-5")
+
+# Or make an independent adapter.
+fast_model = healer.provider("groq", model="openai/gpt-oss-20b")
+result = fast_model.generate("Return one release-note sentence.")
+print(result.text, result.total_tokens)
+```
+
+Every provider returns the same `Generation` shape and records its call as a redacted `LLM` span. `propose_fix` uses the configured default provider, but still accepts an explicit provider or a caller-supplied completion callback for tests and custom gateways.
 
 ## Install and run
 
@@ -82,7 +128,7 @@ Checks are deterministic and evidence-backed. They do not use an LLM to invent a
 
 ## The repair boundary
 
-`healer.propose_fix(...)` sends only redacted findings and cause groups to Amazon Bedrock's Converse API (or a caller-supplied completion function). It accepts only JSON containing a unified diff, rejects path traversal and files outside `allowed_files`, and writes the proposal under `.healer/proposals/` without touching source files.
+`healer.propose_fix(...)` sends only redacted findings and cause groups to the configured provider (or a caller-supplied completion function). It accepts only JSON containing a unified diff, rejects path traversal and files outside `allowed_files`, and writes the proposal under `.healer/proposals/` without touching source files.
 
 Applying is a separate explicit call:
 
@@ -100,7 +146,7 @@ The SDK includes deterministic prompt variants, a model-family guard for attacke
 ## Sponsor adapters
 
 - Neatlogs: SDK instrumentation, Public API traces/span payloads, detection suggestions (read-only), cursor pagination, bounded retries.
-- Amazon Bedrock: Converse API for analysis/fix generation; all payloads are redacted first.
+- OpenAI, Groq, Anthropic, Google Gemini, and Amazon Bedrock: official SDK adapters behind one redacted generation interface.
 - Entire: existing CLI status and prior-session search. Entire is already enabled in this repository; approve the Codex hooks locally so commits receive checkpoints.
 - cfo.ai: measured rates and costs are written to `business/inputs.json`; pricing, revenue, runway, and scenarios stay `TBD` for the user to complete in cfo.ai.
 

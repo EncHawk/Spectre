@@ -27,3 +27,7 @@ class UnsafePatchError(HealerError):
 
 class ExternalToolError(HealerError):
     """A subprocess or optional integration failed."""
+
+
+class ProviderError(HealerError):
+    """A configured model provider rejected or failed a generation request."""
