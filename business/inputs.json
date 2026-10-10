@@ -1,0 +1,11 @@
+{
+  "baseline_success_rate": 0.0,
+  "healed_success_rate": 1.0,
+  "baseline_cost_usd": "TBD",
+  "healed_cost_usd": "TBD",
+  "evaluated_runs": 2,
+  "pricing": "TBD",
+  "revenue": "TBD",
+  "runway": "TBD",
+  "scenario_note": "Complete pricing, revenue, runway, and scenarios in cfo.ai."
+}

@@ -1,0 +1,66 @@
+{
+  "generated_at": "2026-10-10T06:41:50.577118+00:00",
+  "finding_count": 1,
+  "trace_ids": [
+    "cad247e744bb4f03878aa455b92349b0"
+  ],
+  "findings": [
+    {
+      "id": "ee529d37377c31b9",
+      "check": "repeated_tool_calls",
+      "reason": "Tool 'search' was called at least 3 times consecutively with the same input.",
+      "trace_id": "cad247e744bb4f03878aa455b92349b0",
+      "span_id": "29b95efa2dee44d7bc22981e338a6bda",
+      "severity": "high",
+      "trace_url": null,
+      "evidence": {
+        "tool": "search",
+        "repeat_count": 3,
+        "input": {
+          "args": [
+            "Find the latest evidence about agent reliability"
+          ],
+          "kwargs": {}
+        }
+      },
+      "detected_at": "2026-10-10T06:41:50.576552+00:00"
+    }
+  ],
+  "proposal_id": "fix-7838b2b3aebd",
+  "validation": {
+    "accepted": true,
+    "before": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "success_rate": 0.0,
+      "cost_usd": null
+    },
+    "after": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "success_rate": 1.0,
+      "cost_usd": null
+    },
+    "hidden_before": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "success_rate": 0.0,
+      "cost_usd": null
+    },
+    "hidden_after": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "success_rate": 1.0,
+      "cost_usd": null
+    },
+    "reason": "Visible failures are fixed, the suite is green, and hidden performance did not regress."
+  },
+  "cost_usd": {
+    "before": null,
+    "after": null
+  }
+}
