@@ -31,7 +31,7 @@ class NeatlogsClient:
     def __init__(
         self,
         token: str,
-        project_id: str,
+        project_id: str | None,
         host: str = "https://app.neatlogs.com",
         *,
         transport: Transport | None = None,
@@ -52,14 +52,63 @@ class NeatlogsClient:
     def probe(self) -> None:
         self._request("/project")
 
+    def probe_reads(self) -> None:
+        """Confirm both project context and observability read scope."""
+        self.probe()
+        self._request("/traces?limit=1")
+
+    def list_projects(self) -> list[dict[str, str]]:
+        """Discover service-account project bindings without a project header."""
+        projects: list[dict[str, str]] = []
+        cursor: str | None = None
+        while True:
+            query = "?" + urllib.parse.urlencode({"cursor": cursor}) if cursor else ""
+            body = self._request("/projects" + query, project_scope=False)
+            data = body.get("data") or {}
+            items = data.get("projects") if isinstance(data, dict) else None
+            for item in items or []:
+                if not isinstance(item, dict):
+                    continue
+                project_id = item.get("id") or item.get("projectId")
+                name = item.get("name") or item.get("projectName")
+                if isinstance(project_id, str) and isinstance(name, str):
+                    projects.append({"id": project_id, "name": name,
+                                     "role": str(item.get("role") or item.get("callerRole")
+                                                 or item.get("myRole") or "")})
+            page = data.get("page") if isinstance(data, dict) else None
+            cursor = page.get("nextCursor") if isinstance(page, dict) else None
+            if not cursor:
+                return projects
+
+    def list_workflows(self) -> list[str]:
+        """Collect distinct workflow names from every trace page, without loading spans."""
+        cursor: str | None = None
+        names: set[str] = set()
+        while True:
+            query: dict[str, Any] = {"limit": 50}
+            if cursor:
+                query["cursor"] = cursor
+            body = self._request("/traces?" + urllib.parse.urlencode(query))
+            data = body.get("data") or {}
+            for item in data.get("traces", []) if isinstance(data, dict) else []:
+                name = item.get("workflowName") if isinstance(item, dict) else None
+                if isinstance(name, str) and name.strip():
+                    names.add(name)
+            page = data.get("page") if isinstance(data, dict) else None
+            cursor = page.get("nextCursor") if isinstance(page, dict) else None
+            if not cursor:
+                return sorted(names, key=str.casefold)
+
     def list_traces(
         self,
         *,
         since: str = "24h",
         tag: str | None = None,
         trace_id: str | None = None,
-        limit: int = 100,
-        max_pages: int = 20,
+        limit: int | None = 100,
+        max_pages: int | None = 20,
+        from_timestamp: str | None = None,
+        workflow_name: str | None = None,
     ) -> list[Trace]:
         if trace_id:
             raw = self._request(f"/traces/{urllib.parse.quote(trace_id, safe='')}")
@@ -69,11 +118,16 @@ class NeatlogsClient:
             return [trace]
         cursor: str | None = None
         results: list[Trace] = []
-        for _ in range(max_pages):
-            query: dict[str, Any] = {
-                "limit": min(limit, 50),
-                "from": parse_since(since).isoformat(),
-            }
+        pages = 0
+        while max_pages is None or pages < max_pages:
+            pages += 1
+            query: dict[str, Any] = {"limit": min(limit, 50) if limit is not None else 50}
+            if from_timestamp:
+                query["from"] = from_timestamp
+            elif since != "all":
+                query["from"] = parse_since(since).isoformat()
+            if workflow_name:
+                query["workflowName"] = workflow_name
             if cursor:
                 query["cursor"] = cursor
             body = self._request("/traces?" + urllib.parse.urlencode(query))
@@ -83,20 +137,22 @@ class NeatlogsClient:
                 if isinstance(item, dict):
                     trace = Trace.from_dict(item, source="neatlogs")
                     if not tag or tag in trace.tags:
-                        self._hydrate_spans(trace)
                         results.append(trace)
             page = data.get("page") if isinstance(data, dict) else None
             cursor = page.get("nextCursor") if isinstance(page, dict) else None
-            if not cursor or len(results) >= limit:
+            if not cursor or (limit is not None and len(results) >= limit):
                 break
-        return results[:limit]
+        selected = results[:limit] if limit is not None else results
+        for trace in selected:
+            self._hydrate_spans(trace)
+        return selected
 
     def _hydrate_spans(self, trace: Trace) -> None:
         if trace.spans:
             return
         cursor: str | None = None
         spans: list[Span] = []
-        for _ in range(10):
+        while True:
             query = {"limit": 50}
             if cursor:
                 query["cursor"] = cursor
@@ -149,14 +205,17 @@ class NeatlogsClient:
                 break
         return suggestions[:limit]
 
-    def _request(self, path: str) -> dict[str, Any]:
+    def _request(self, path: str, *, project_scope: bool = True) -> dict[str, Any]:
         url = self.base_url + path
         headers = {
             "Authorization": f"Bearer {self._token}",
-            "x-project-id": self.project_id,
             "Accept": "application/json",
             "User-Agent": "spectre-healer/0.1",
         }
+        if project_scope:
+            if not self.project_id:
+                raise ValueError("Project ID is required for this NeatLogs request")
+            headers["x-project-id"] = self.project_id
         for attempt in range(self._max_retries + 1):
             try:
                 response = self._transport("GET", url, headers)

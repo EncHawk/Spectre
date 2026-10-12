@@ -1,5 +1,7 @@
 # Spectre control-plane integration handoff
 
+> NeatLogs connection update: `/app` now accepts a per-user service-account read token, discovers projects by name through `GET /api/v1/public/projects`, derives agents from trace `workflowName`, and incrementally syncs the selected project/workflow into `HEALER_NEATLOGS_CACHE`. The repository-based flow below remains as historical implementation context for the legacy routes.
+
 Updated 2026-10-12. This is the copyable implementation and verification spec for a coding agent.
 
 Run Python and migration commands from `backend/`. Service configuration lives in the ignored `backend/.env`; run `make migrate` before starting the backend with `make serve`.

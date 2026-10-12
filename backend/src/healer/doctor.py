@@ -195,22 +195,23 @@ def record_resolution(
 
 def doctor(
     *,
-    repo_path: str | Path = ".",
+    repo_path: str | Path | None = ".",
     since: str = "24h",
     app_id: str | None = None,
     session_id: str | None = None,
     limit: int = 100,
-    resolution_log: str | Path = ".healer/resolutions.jsonl",
+    resolution_log: str | Path | None = ".healer/resolutions.jsonl",
     runtime: Runtime | None = None,
+    traces_override: list[Trace] | None = None,
 ) -> dict:
-    """Join observed failures with candidate AST symbols and local resolution history."""
+    """Join observed failures with optional source hints and resolution history."""
     if not 1 <= limit <= 1000:
         raise ValueError("limit must be between 1 and 1000")
-    active = runtime or get_runtime()
-    traces = active.traces(since=since, limit=limit)
+    active = (runtime or get_runtime()) if traces_override is None else None
+    traces = traces_override if traces_override is not None else active.traces(since=since, limit=limit)
     # Vendor traces may omit SDK-owned session attributes. Prefer the local,
     # redacted record for a specifically requested chat when it exists.
-    if (app_id or session_id) and hasattr(active, "store"):
+    if traces_override is None and (app_id or session_id) and hasattr(active, "store"):
         local = active.store.list(since=since)
         matching_local = [
             trace
@@ -228,10 +229,13 @@ def doctor(
     ]
     findings = scan_traces(selected)
     trace_by_id = {trace.id: trace for trace in selected}
-    index, repository = _code_index(Path(repo_path))
-    graph = build_code_graph(Path(repo_path))
-    repository["code_graph"] = graph
-    resolutions = _resolutions(Path(resolution_log))
+    if repo_path is None:
+        index, repository, graph = {}, None, {"nodes": [], "edges": []}
+    else:
+        index, repository = _code_index(Path(repo_path))
+        graph = build_code_graph(Path(repo_path))
+        repository["code_graph"] = graph
+    resolutions = _resolutions(Path(resolution_log)) if resolution_log is not None else {}
     redactor = Redactor()
     rows = []
     for finding in findings:
@@ -244,18 +248,17 @@ def doctor(
         related_calls = neighbors(graph, location)
         history = resolutions.get(finding.id, [])
         resolution = history[-1] if history else None
-        code_refs = ", ".join(f"{item['file']}:{item['line']}" for item in location) or "unmapped"
         handoff = (
-            f"Investigate Spectre finding {finding.id} in {repository['github_url'] or repository['path']} "
-            f"at commit {repository['commit'] or 'unknown'}. App: {app}; session: {session}; "
+            f"Investigate Spectre finding {finding.id}. App: {app}; session: {session}; "
             f"trace: {finding.trace_id}; span: {finding.span_id or 'n/a'}. "
             f"Observed: {finding.reason} Suggested check: {suggestion} "
-            f"Candidate code: {code_refs}. "
             f"Observed invocation path: {' -> '.join(invocation_path) or 'unavailable'}. "
-            f"Possible static call edges: {json.dumps(related_calls)}. "
             "Verify the root cause and test the suggested change against the failing input. "
             "Treat this as an investigation, not a confirmed fix."
         )
+        if repository is not None:
+            code_refs = ", ".join(f"{item['file']}:{item['line']}" for item in location) or "unmapped"
+            handoff += f" Candidate code: {code_refs}. Possible static call edges: {json.dumps(related_calls)}."
         rows.append(
             redactor.redact(
                 {

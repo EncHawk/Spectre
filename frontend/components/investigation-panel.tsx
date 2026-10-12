@@ -11,7 +11,7 @@ type Investigation = {
   basis: string;
 };
 
-export function InvestigationPanel({ appId, findingId }: { appId: string; findingId: string }) {
+export function InvestigationPanel({ appId, projectId, workflowName, findingId }: { appId?: string; projectId?: string; workflowName?: string; findingId: string }) {
   const [result, setResult] = useState<Investigation | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -19,9 +19,9 @@ export function InvestigationPanel({ appId, findingId }: { appId: string; findin
   async function investigate() {
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/investigations", {
+      const response = await fetch(projectId ? "/api/neatlogs/investigations" : "/api/investigations", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ app_id: appId, finding_id: findingId }),
+        body: JSON.stringify(projectId ? { project_id: projectId, workflow_name: workflowName, finding_id: findingId } : { app_id: appId, finding_id: findingId }),
       });
       const value = await response.json();
       if (!response.ok) throw new Error(value.error || "Investigation failed");
@@ -33,7 +33,7 @@ export function InvestigationPanel({ appId, findingId }: { appId: string; findin
   async function copy() {
     if (!result) return;
     await navigator.clipboard.writeText(
-      `Spectre investigation for ${appId}\nFinding: ${result.evidence.finding_id}\nTrace: ${result.evidence.trace_id}\nObserved: ${result.evidence.reason}\nLikely cause (hypothesis): ${result.likely_cause}\nSuggested fix: ${result.suggested_fix}\nHow to verify: ${result.how_to_verify}`
+      `Spectre investigation for ${workflowName || appId}\nFinding: ${result.evidence.finding_id}\nTrace: ${result.evidence.trace_id}\nObserved: ${result.evidence.reason}\nLikely cause (hypothesis): ${result.likely_cause}\nSuggested fix: ${result.suggested_fix}\nHow to verify: ${result.how_to_verify}`
     );
   }
 

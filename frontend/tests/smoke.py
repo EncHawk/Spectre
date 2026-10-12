@@ -30,6 +30,7 @@ class Doctor(BaseHTTPRequestHandler):
     key_value = "spk_deadbeef_" + "A" * 43
     revoked = False
     key_created = False
+    neatlogs_calls = []
 
     def do_GET(self):
         assert self.headers["Authorization"] == "Bearer test-service-token"
@@ -63,7 +64,30 @@ class Doctor(BaseHTTPRequestHandler):
     def do_POST(self):
         assert self.headers["Authorization"] == "Bearer test-service-token"
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-        if self.path.startswith("/internal/projects"):
+        if self.path.startswith("/v1/neatlogs/"):
+            Doctor.neatlogs_calls.append((self.path, body))
+            assert body["host"] == "https://app.neatlogs.com"
+            if body["read_token"] == "expired":
+                self.send_json({"error": "NeatLogs read token expired"}, status=401)
+            elif self.path.endswith("/projects"):
+                assert "project_id" not in body
+                self.send_json({"projects": [
+                    {"id": self.project_id, "name": "Orders", "role": "project_viewer"},
+                    {"id": self.key_id, "name": "Research", "role": "project_viewer"},
+                ]})
+            elif self.path.endswith("/workflows"):
+                assert body["project_id"] in {self.project_id, self.key_id}
+                self.send_json({"workflows": ["research-agent", "support-agent"]})
+            elif self.path.endswith("/doctor"):
+                assert body["project_id"] == self.key_id
+                assert body["workflow_name"] == "research-agent"
+                assert body["user_id"] == "google-sub-1"
+                self.send_json({"repository": None, "trace_count": 1, "finding_count": 0, "rows": [], "runs": []})
+            else:
+                assert body["project_id"] == self.key_id and body["workflow_name"] == "research-agent"
+                assert body["finding_id"] == "a" * 16
+                self.send_json({"suggested_fix": "Inspect the trace"})
+        elif self.path.startswith("/internal/projects"):
             assert self.headers["X-Spectre-User-Id"] == "google-sub-1"
             if self.path.endswith("/keys"):
                 assert body == {"scopes": ["runs:read"]}
@@ -111,7 +135,7 @@ def run():
         database = Path(temp) / "control.sqlite"
         env = dict(os.environ, SPECTRE_PUBLIC_URL=base, SPECTRE_DB_PATH=str(database),
                    SPECTRE_ENCRYPTION_KEY="ab" * 32, HEALER_API_URL=f"http://127.0.0.1:{api_port}",
-                   SPECTRE_ALLOWED_EMAIL="dev@example.com",
+                   SPECTRE_ALLOWED_EMAILS="dev@example.com,other@example.com",
                    HEALER_SERVER_TOKEN="test-service-token")
         process = subprocess.Popen(["npm", "run", "start", "--", "-p", str(app_port)], cwd=ROOT,
                                    env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -158,18 +182,21 @@ def run():
             assert page("/app")[:2] == (307, "/")
             assert page("/setup")[:2] == (307, "/")
             token = "integration-session"
+            other_token = "other-session"
             # A cookie-bearing request initializes the control-plane schema.
             assert request("/api/me", token=token)[0] == 401
             with sqlite3.connect(database) as db:
                 db.execute("INSERT INTO users VALUES(?,?,?)", ("google-sub-1", "dev@example.com", "Developer"))
                 db.execute("INSERT INTO sessions VALUES(?,?,?)", (hashlib.sha256(token.encode()).hexdigest(), "google-sub-1", int(time.time() * 1000) + 60000))
+                db.execute("INSERT INTO users VALUES(?,?,?)", ("google-sub-2", "other@example.com", "Other"))
+                db.execute("INSERT INTO sessions VALUES(?,?,?)", (hashlib.sha256(other_token.encode()).hexdigest(), "google-sub-2", int(time.time() * 1000) + 60000))
                 db.execute("INSERT INTO sessions VALUES(?,?,?)", (hashlib.sha256(b"expired-session").hexdigest(), "google-sub-1", int(time.time() * 1000) - 1))
                 db.execute("INSERT INTO repositories(user_id,full_name,default_branch,commit_sha,file_count,indexed_at,files_json) VALUES(?,?,?,?,?,?,?)",
                            ("google-sub-1", "example/agent", "main", "b" * 40, 1, "2026-10-12T00:00:00Z", '[{"path":"agent.py","size":12}]'))
             assert request("/api/me", token=token)[1]["user"]["email"] == "dev@example.com"
             assert page("/app", "expired-session")[:2] == (307, "/")
-            assert page("/app", token)[:2] == (307, "/setup")
-            assert page("/app/investigation", token)[:2] == (307, "/setup")
+            assert page("/app", token)[0] == 200
+            assert page("/app/investigation", token)[0] == 200
             assert page("/setup", token)[0] == 200
             assert request("/api/projects")[0] == 401
             assert request("/api/projects", method="POST", body={"app_id": "orders", "name": "Orders"}, origin=base)[0] == 401
@@ -187,7 +214,29 @@ def run():
             assert "key" not in request(key_path, token=token)[1]["keys"][0]
             assert request(key_path + "/" + Doctor.key_id, method="DELETE", token=token, origin=base)[1]["revoked"]
             assert request(key_path, token=token)[1]["keys"][0]["revoked_at"]
-            assert page("/app", token)[:2] == (307, "/setup")
+            assert page("/app", token)[0] == 200
+            assert request("/api/neatlogs")[0] == 401
+            assert request("/api/neatlogs", token=token)[1] == {"connected": False, "host": "https://app.neatlogs.com", "token_updated_at": None, "projects": [], "agents": []}
+            assert request("/api/neatlogs", method="POST", body={"read_token": "read-one"}, token=token, origin="http://evil.example")[0] == 403
+            assert request("/api/neatlogs", method="POST", body={"read_token": "expired"}, token=token, origin=base)[0] == 401
+            assert request("/api/neatlogs", token=token)[1]["connected"] is False
+            assert request("/api/neatlogs", method="POST", body={"read_token": "read-one"}, token=token, origin=base)[0] == 200
+            assert request("/api/neatlogs", method="POST", body={}, token=token, origin=base)[0] == 200
+            assert Doctor.neatlogs_calls[-1][1]["read_token"] == "read-one"
+            assert len(request("/api/neatlogs", token=token)[1]["projects"]) == 2
+            assert request("/api/neatlogs", token=token)[1]["projects"][0]["name"] == "Orders"
+            assert "read_token" not in json.dumps(request("/api/neatlogs", token=token)[1])
+            assert request("/api/neatlogs/workflows?project_id=" + Doctor.key_id, token=token)[1]["workflows"] == ["research-agent", "support-agent"]
+            assert request("/api/neatlogs/agents", method="POST", body={"project_id": Doctor.key_id, "workflow_name": "research-agent"}, token=token, origin=base)[0] == 201
+            assert request("/api/neatlogs", token=token)[1]["agents"][0]["workflow_name"] == "research-agent"
+            report_path = "/api/neatlogs/report?project_id=" + Doctor.key_id + "&workflow_name=research-agent"
+            assert request(report_path, token=token)[1]["trace_count"] == 1
+            assert request("/api/neatlogs", token=other_token)[1]["projects"] == []
+            assert request(report_path, token=other_token)[0] == 404
+            assert request("/api/neatlogs/investigations", method="POST", body={"project_id": Doctor.key_id, "workflow_name": "research-agent", "finding_id": "a" * 16}, token=token, origin=base)[1]["suggested_fix"] == "Inspect the trace"
+            assert request("/api/neatlogs", method="POST", body={"read_token": "read-two"}, token=token, origin=base)[0] == 200
+            assert request(report_path, token=token)[0] == 200
+            assert Doctor.neatlogs_calls[-1][1]["read_token"] == "read-two"
             csrf = request("/api/agents", method="POST", token=token, origin="http://evil.example",
                            body={"app_id": "orders", "name": "Orders"})
             assert csrf[0] == 403, csrf
@@ -209,7 +258,7 @@ def run():
             assert request("/api/investigations", method="POST", token=token, origin="http://evil.example", body={"app_id": "orders", "finding_id": "a" * 16})[0] == 403
             assert request("/api/investigations", method="POST", token=token, origin=base, body={"app_id": "other", "finding_id": "a" * 16})[0] == 400
             assert request("/api/investigations", method="POST", token=token, origin=base, body={"app_id": "orders", "finding_id": "a" * 16})[1]["suggested_fix"] == "Gate success on confirmation"
-            print("Smoke passed: session auth, CSRF, key creation/revocation, Doctor, example run, investigation, repository snapshot")
+            print("Smoke passed: auth, CSRF, NeatLogs token reuse and rotation, project isolation, trace report, legacy routes")
         finally:
             process.terminate()
             try: process.wait(timeout=5)

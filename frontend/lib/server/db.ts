@@ -16,6 +16,20 @@ export function db() {
       CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), expires_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS github_connections (user_id TEXT PRIMARY KEY REFERENCES users(id), login TEXT NOT NULL, token TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS neatlogs_connections (
+        user_id TEXT PRIMARY KEY REFERENCES users(id), read_token TEXT NOT NULL,
+        host TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS neatlogs_projects (
+        user_id TEXT NOT NULL REFERENCES users(id), project_id TEXT NOT NULL, added_at TEXT NOT NULL,
+        PRIMARY KEY(user_id, project_id)
+      );
+      CREATE TABLE IF NOT EXISTS neatlogs_agents (
+        user_id TEXT NOT NULL, project_id TEXT NOT NULL, workflow_name TEXT NOT NULL,
+        selected_at TEXT NOT NULL,
+        PRIMARY KEY(user_id, project_id, workflow_name),
+        FOREIGN KEY(user_id, project_id) REFERENCES neatlogs_projects(user_id, project_id)
+      );
       CREATE TABLE IF NOT EXISTS repositories (
         id INTEGER PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), full_name TEXT NOT NULL,
         default_branch TEXT NOT NULL, commit_sha TEXT NOT NULL, file_count INTEGER NOT NULL,
@@ -28,6 +42,10 @@ export function db() {
         created_at TEXT NOT NULL, UNIQUE(user_id, app_id)
       );
     `);
+    const columns = database.prepare("PRAGMA table_info(neatlogs_projects)").all() as Array<{ name: string }>;
+    if (!columns.some((column) => column.name === "name")) database.exec("ALTER TABLE neatlogs_projects ADD COLUMN name TEXT");
+    if (!columns.some((column) => column.name === "role")) database.exec("ALTER TABLE neatlogs_projects ADD COLUMN role TEXT");
+    if (!columns.some((column) => column.name === "available")) database.exec("ALTER TABLE neatlogs_projects ADD COLUMN available INTEGER NOT NULL DEFAULT 1");
   }
   return database;
 }

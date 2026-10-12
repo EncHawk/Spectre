@@ -9,8 +9,8 @@ export const OAUTH_COOKIE = "spectre_oauth";
 export const secure = process.env.NODE_ENV === "production";
 
 function allowedEmail(email: string) {
-  const configured = process.env.SPECTRE_ALLOWED_EMAIL;
-  return Boolean(configured && email.toLowerCase() === configured.trim().toLowerCase());
+  const configured = process.env.SPECTRE_ALLOWED_EMAILS || process.env.SPECTRE_ALLOWED_EMAIL;
+  return Boolean(configured && configured.split(",").some((entry) => email.toLowerCase() === entry.trim().toLowerCase()));
 }
 
 export async function currentUser() {

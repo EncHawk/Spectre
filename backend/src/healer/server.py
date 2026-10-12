@@ -14,8 +14,10 @@ from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 from .control_db import ControlDB, InvalidInput, NotFound
-from .errors import ConfigurationError, HealerError
+from .errors import AuthenticationError, ConfigurationError, HealerError, PermissionDeniedError
 from .investigation import investigate_finding
+from .neatlogs_client import NeatlogsClient
+from .neatlogs_cache import NeatlogsTraceCache
 from .repository_ingest import RepositoryRegistry
 
 _MAX_BODY_BYTES = 64 * 1024
@@ -30,6 +32,7 @@ class ServerSettings:
     repo_path: Path = Path(".")
     resolution_log: Path = Path("/data/resolutions.jsonl")
     repo_registry: Path = Path("/data/repositories")
+    neatlogs_cache: Path = Path("/data/neatlogs-traces.sqlite")
     allow_unauthenticated: bool = False
 
     @classmethod
@@ -60,6 +63,7 @@ class ServerSettings:
             repo_path=Path(os.getenv("HEALER_REPO_PATH", ".")),
             resolution_log=Path(os.getenv("HEALER_RESOLUTION_LOG", "/data/resolutions.jsonl")),
             repo_registry=Path(os.getenv("HEALER_REPO_REGISTRY", "/data/repositories")),
+            neatlogs_cache=Path(os.getenv("HEALER_NEATLOGS_CACHE", "/data/neatlogs-traces.sqlite")),
             allow_unauthenticated=allowed,
         )
 
@@ -139,6 +143,50 @@ class HealerService:
             session_id=_optional_string(options.get("session_id")),
             limit=_limit(options.get("limit", 100)),
         )
+
+    def neatlogs_client(self, options: dict[str, Any], *, require_project: bool = True) -> NeatlogsClient:
+        token = options.get("read_token")
+        project_id = options.get("project_id")
+        host = options.get("host", "https://app.neatlogs.com")
+        if not isinstance(token, str) or not token:
+            raise ValueError("NeatLogs read token is required")
+        if require_project and (not isinstance(project_id, str) or not project_id):
+            raise ValueError("NeatLogs project ID is required")
+        if host not in {"https://app.neatlogs.com", "https://eu.app.neatlogs.com"}:
+            raise ValueError("Unsupported NeatLogs host")
+        return NeatlogsClient(token, project_id if isinstance(project_id, str) else None, host)
+
+    def neatlogs_projects(self, options: dict[str, Any]) -> dict[str, Any]:
+        return {"projects": self.neatlogs_client(options, require_project=False).list_projects()}
+
+    def neatlogs_workflows(self, options: dict[str, Any]) -> dict[str, Any]:
+        return {"workflows": self.neatlogs_client(options).list_workflows()}
+
+    def neatlogs_probe(self, options: dict[str, Any]) -> dict[str, Any]:
+        self.neatlogs_client(options).probe_reads()
+        return {"connected": True}
+
+    def neatlogs_doctor(self, options: dict[str, Any]) -> dict[str, Any]:
+        from .doctor import doctor
+
+        client = self.neatlogs_client(options)
+        workflow_name = options.get("workflow_name")
+        user_id = options.get("user_id")
+        if not isinstance(workflow_name, str) or not workflow_name or not isinstance(user_id, str) or not user_id:
+            raise ValueError("User and workflow are required")
+        traces = NeatlogsTraceCache(self.settings.neatlogs_cache).sync(
+            user_id, client.project_id, workflow_name, client)
+        return doctor(repo_path=None, traces_override=traces, limit=1000,
+                      resolution_log=None)
+
+    def neatlogs_investigate(self, options: dict[str, Any]) -> dict[str, Any]:
+        finding_id = str(options.get("finding_id", ""))
+        report = self.neatlogs_doctor(options)
+        row = next((item for item in report["rows"] if item["finding"]["id"] == finding_id), None)
+        if row is None:
+            raise ValueError("finding was not found in this NeatLogs project")
+        run = next((item for item in report["runs"] if item["trace_id"] == row["finding"]["trace_id"]), None)
+        return investigate_finding(row, run)
 
     def ingest_repository(self, options: dict[str, Any]) -> dict[str, Any]:
         return RepositoryRegistry(self.settings.repo_registry).ingest(
@@ -302,6 +350,11 @@ def make_handler(service: HealerService) -> type[BaseHTTPRequestHandler]:
                 "/v1/example-runs",
                 "/v1/proposals",
                 "/v1/investigations",
+                "/v1/neatlogs/probe",
+                "/v1/neatlogs/projects",
+                "/v1/neatlogs/workflows",
+                "/v1/neatlogs/doctor",
+                "/v1/neatlogs/investigations",
             }:
                 self._json(HTTPStatus.NOT_FOUND, {"error": "route not found"})
                 return
@@ -310,6 +363,22 @@ def make_handler(service: HealerService) -> type[BaseHTTPRequestHandler]:
                 return
             if route.path == "/v1/scan":
                 self._scan(value)
+            elif route.path.startswith("/v1/neatlogs/"):
+                try:
+                    action = {
+                        "/v1/neatlogs/probe": service.neatlogs_probe,
+                        "/v1/neatlogs/projects": service.neatlogs_projects,
+                        "/v1/neatlogs/workflows": service.neatlogs_workflows,
+                        "/v1/neatlogs/doctor": service.neatlogs_doctor,
+                        "/v1/neatlogs/investigations": service.neatlogs_investigate,
+                    }[route.path]
+                    self._json(HTTPStatus.OK, action(value))
+                except AuthenticationError as exc:
+                    self._json(HTTPStatus.UNAUTHORIZED, {"error": str(exc)})
+                except PermissionDeniedError as exc:
+                    self._json(HTTPStatus.FORBIDDEN, {"error": str(exc)})
+                except (HealerError, ValueError) as exc:
+                    self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             elif route.path == "/v1/example-runs":
                 try:
                     self._json(HTTPStatus.OK, service.run_example(value))

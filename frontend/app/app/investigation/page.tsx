@@ -1,3 +1,3 @@
-import { ControlPlane } from "@/components/control-plane";
+import { NeatlogsWorkspace } from "@/components/neatlogs-workspace";
 
-export default function InvestigationPage() { return <ControlPlane />; }
+export default function InvestigationPage() { return <NeatlogsWorkspace />; }

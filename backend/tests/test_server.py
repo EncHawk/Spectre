@@ -43,6 +43,21 @@ class Service:
             "suggested_fix": "Check the gateway response",
         }
 
+    def neatlogs_probe(self, options):
+        return {"connected": options["read_token"] == "read-token"}
+
+    def neatlogs_projects(self, options):
+        return {"projects": [{"id": "project", "name": "Orders", "role": "project_viewer"}]}
+
+    def neatlogs_workflows(self, options):
+        return {"workflows": ["support-agent"]}
+
+    def neatlogs_doctor(self, options):
+        return {"trace_count": 1, "project_id": options["project_id"]}
+
+    def neatlogs_investigate(self, options):
+        return {"finding_id": options["finding_id"]}
+
 
 def exchange(request: bytes) -> tuple[int, dict]:
     server_socket, client_socket = socket.socketpair()
@@ -148,6 +163,13 @@ def test_proposal_route_requires_service_token():
     status, payload = post("/v1/proposals", body, "secret-token")
     assert status == 200
     assert payload["finding_id"] == body["finding_id"]
+
+
+def test_neatlogs_routes_require_service_token():
+    body = {"project_id": "project", "read_token": "read-token"}
+    assert post("/v1/neatlogs/probe", body, "wrong") == (401, {"error": "unauthorized"})
+    assert post("/v1/neatlogs/probe", body, "secret-token") == (200, {"connected": True})
+    assert post("/v1/neatlogs/doctor", body, "secret-token") == (200, {"trace_count": 1, "project_id": "project"})
 
 
 def test_investigation_route_requires_service_token():

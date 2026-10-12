@@ -2,16 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Boxes, GitBranch, KeyRound, LayoutDashboard, Menu, TestTubeDiagonal, X } from "lucide-react";
+import { BookOpen, LayoutDashboard, Menu, ScanSearch, TestTubeDiagonal, X } from "lucide-react";
 import { useState } from "react";
 import { Logo } from "./logo";
 
 const navigation = [
   { href: "/app", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/app/investigation", label: "Investigation", icon: TestTubeDiagonal },
-  { href: "/app#repositories", label: "Repositories", icon: GitBranch },
-  { href: "/app#agents", label: "Agents", icon: Boxes },
-  { href: "/app#project-keys", label: "API keys", icon: KeyRound },
+  { href: "/app#neatlogs", label: "NeatLogs", icon: ScanSearch },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {

@@ -1,2 +1,2 @@
-import { ControlPlane } from "@/components/control-plane";
-export default function DashboardPage() { return <ControlPlane />; }
+import { NeatlogsWorkspace } from "@/components/neatlogs-workspace";
+export default function DashboardPage() { return <NeatlogsWorkspace />; }

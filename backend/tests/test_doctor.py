@@ -83,6 +83,19 @@ def test_doctor_joins_trace_to_tracked_ast_without_source_body(tmp_path):
     )
 
 
+def test_doctor_scans_external_traces_without_repository(tmp_path):
+    trace = Trace("external-trace", "support", spans=[Span(
+        "tool-span", "external-trace", "search", kind="TOOL", status="error", error="timeout"
+    )], status="error")
+    result = doctor(repo_path=None, traces_override=[trace],
+                    resolution_log=tmp_path / "missing.jsonl")
+    assert result["repository"] is None
+    assert result["trace_count"] == 1
+    assert result["finding_count"] >= 1
+    assert result["rows"][0]["candidate_locations"] == []
+    assert "Candidate code" not in result["rows"][0]["copy_to_agent"]
+
+
 def test_resolution_history_is_append_only_and_validates_pr(tmp_path):
     path = tmp_path / "resolutions.jsonl"
     record_resolution("a" * 16, status="investigating", note="first", path=path)
