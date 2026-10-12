@@ -90,9 +90,9 @@ Going further (needs more access):
 
 Check that each step actually works before starting the next. If time runs short, cut from the end. Never cut steps 1 to 4, the sealed test set, the cfo.ai numbers, the build log, or the demo.
 
-## Not building
+## Original scope boundary
 
-No sandbox infrastructure, no Composio/OAuth, no web UI, nothing that depends on neatlogs Datasets (not released yet), no self-hosted neatlogs support.
+The initial SDK scope excluded OAuth. The later control-plane implementation adds Google sign-in and GitHub OAuth repository snapshots; see `backend/INTEGRATION_HANDOFF.md`. It does not add automatic PR creation, sandbox infrastructure, unreleased neatlogs Datasets, or self-hosted neatlogs support.
 
 ## Docs to read first
 

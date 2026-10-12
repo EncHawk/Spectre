@@ -12,6 +12,7 @@ from typing import Any
 
 from .adversarial import Fault, attack, inject_fault, variant_cases, variants
 from .causes import group_causes
+from .doctor import doctor, record_resolution
 from .errors import ConfigurationError
 from .fixes import apply_proposal, propose_fix
 from .models import (
@@ -35,7 +36,7 @@ from .providers import (
 from .pull_request import open_pull_request
 from .regression import findings_to_cases, run_cases, seal_cases, validate_candidate
 from .report import build_report, write_report
-from .runtime import Runtime, get_runtime, init_runtime
+from .runtime import Runtime, get_runtime, init_runtime, session
 from .scanner import scan, scan_traces
 
 
@@ -194,6 +195,7 @@ __all__ = [
     "apply_proposal",
     "attack",
     "build_report",
+    "doctor",
     "findings_to_cases",
     "get_default_provider",
     "group_causes",
@@ -203,10 +205,12 @@ __all__ = [
     "open_pull_request",
     "propose_fix",
     "provider",
+    "record_resolution",
     "run_cases",
     "scan",
     "scan_traces",
     "seal_cases",
+    "session",
     "tool",
     "trace",
     "validate_candidate",

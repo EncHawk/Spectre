@@ -41,6 +41,18 @@ def test_successful_retry_is_recovery():
     assert "ignored_error" not in checks(trace_with(root, failed, recovered))
 
 
+def test_failed_run_without_answer_is_not_ignored_error():
+    root = span("r", "agent", "AGENT", status="error", error="timeout", output=None)
+    failed = span("f", "search", status="error", error="timeout", parent_id="r")
+    assert "ignored_error" not in checks(trace_with(root, failed, status="error"))
+
+
+def test_research_about_failures_is_not_a_tool_error():
+    root = span("r", "agent", "AGENT", output={"summary": "Agent failure diagnosis"})
+    tool = span("s", "research", output={"product": "Detects agent failures"}, parent_id="r")
+    assert "ignored_error" not in checks(trace_with(root, tool))
+
+
 def test_loop_detection():
     root = span("r", "agent", "AGENT", output="answer")
     items = []

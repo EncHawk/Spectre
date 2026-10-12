@@ -97,3 +97,20 @@ def test_init_reports_missing_provider_auth_without_exposing_secrets(tmp_path, m
     assert not capability.model_generation
     assert capability.model_provider is None
     assert "OPENAI_API_KEY" in capability.model_detail
+
+
+def test_neatlogs_maps_model_span_to_supported_kind(tmp_path):
+    runtime = init_runtime(local_log=tmp_path / "runs.jsonl")
+    received = []
+
+    class FakeNeatlogs:
+        def span(self, *, kind, name):
+            received.append((kind, name))
+            return lambda function: function
+
+    runtime._neatlogs = FakeNeatlogs()
+    call = runtime.instrument(lambda: "ok", name="healer.openai", kind="LLM")
+
+    assert call() == "ok"
+    assert received == [("CHAIN", "healer.openai")]
+    assert runtime.store.list("1h")[0].spans[0].kind == "LLM"

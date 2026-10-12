@@ -19,6 +19,24 @@ class Service:
     def scan(self, options):
         return {"count": 0, "findings": [], "options": options}
 
+    def doctor(self, options):
+        return {"trace_count": 0, "finding_count": 0, "rows": [], "options": options}
+
+    def record_resolution(self, options):
+        return {"finding_id": options["finding_id"], "status": options["status"]}
+
+    def ingest_repository(self, options):
+        return {"full_name": options["full_name"], "indexed": True}
+
+    def examples(self):
+        return {"examples": [{"id": "checkout_support"}]}
+
+    def run_example(self, options):
+        return {"example": options["example"], "before_passed": 1, "after_passed": 3}
+
+    def propose(self, options):
+        return {"proposal": {"status": "proposed"}, "finding_id": options["finding_id"]}
+
 
 def exchange(request: bytes) -> tuple[int, dict]:
     server_socket, client_socket = socket.socketpair()
@@ -84,6 +102,46 @@ def test_scan_accepts_get_and_post():
     )
     assert status == 200
     assert payload["options"]["tag"] == "production"
+
+
+def test_doctor_and_resolution_routes_require_token():
+    assert get("/v1/doctor") == (401, {"error": "unauthorized"})
+    status, payload = get("/v1/doctor?app_id=orders&session_id=chat-42", "secret-token")
+    assert status == 200
+    assert payload["options"] == {"app_id": "orders", "session_id": "chat-42"}
+    status, payload = post(
+        "/v1/resolutions", {"finding_id": "a" * 16, "status": "investigating"}, "secret-token"
+    )
+    assert status == 200
+    assert payload["status"] == "investigating"
+
+
+def test_repository_ingest_requires_service_token():
+    body = {"full_name": "example/agent", "commit_sha": "a" * 40}
+    assert get("/v1/repositories") == (401, {"error": "unauthorized"})
+    status, payload = post("/v1/repositories", body, "secret-token")
+    assert status == 200
+    assert payload == {"full_name": "example/agent", "indexed": True}
+
+
+def test_example_catalog_and_run_require_service_token():
+    assert get("/v1/examples") == (401, {"error": "unauthorized"})
+    assert post("/v1/example-runs", {"example": "checkout_support"}, "wrong") == (
+        401,
+        {"error": "unauthorized"},
+    )
+    assert get("/v1/examples", "secret-token")[1]["examples"][0]["id"] == "checkout_support"
+    status, payload = post("/v1/example-runs", {"example": "checkout_support"}, "secret-token")
+    assert status == 200
+    assert payload["after_passed"] == 3
+
+
+def test_proposal_route_requires_service_token():
+    body = {"finding_id": "a" * 16}
+    assert post("/v1/proposals", body, "wrong") == (401, {"error": "unauthorized"})
+    status, payload = post("/v1/proposals", body, "secret-token")
+    assert status == 200
+    assert payload["finding_id"] == body["finding_id"]
 
 
 def test_server_requires_explicit_auth_choice(monkeypatch):

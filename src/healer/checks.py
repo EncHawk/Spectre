@@ -54,7 +54,8 @@ def repeated_tool_calls(trace: Trace, _: list[Trace]) -> Iterable[Finding]:
 
 def ignored_errors(trace: Trace, _: list[Trace]) -> Iterable[Finding]:
     for index, span in enumerate(trace.spans):
-        failed = span.status == "error" or span.error or _FAILURE_WORDS.search(_text(span.output))
+        failed_output = isinstance(span.output, str) and _FAILURE_WORDS.match(span.output.lstrip())
+        failed = span.status == "error" or span.error or failed_output
         if not failed:
             continue
         later = trace.spans[index + 1 :]
@@ -66,8 +67,8 @@ def ignored_errors(trace: Trace, _: list[Trace]) -> Iterable[Finding]:
             )
             for candidate in later
         )
-        root_output = _text(trace.spans[0].output) if trace.spans else ""
-        if not recovered and root_output:
+        root_output = trace.spans[0].output if trace.spans else None
+        if not recovered and root_output is not None and _text(root_output).strip():
             yield _finding(
                 trace,
                 span,

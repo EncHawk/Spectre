@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Spectre · Doctor</title>
+  <link rel="stylesheet" href="/app/dashboard.css">
+  <script defer src="/app/dashboard.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar"><div class="brand"><span class="mark">✳</span> SPECTRE <span class="brand-suffix">/ DOCTOR</span></div><span class="top-note">Agent observability</span></header>
+    <main>
+      <div class="heading"><div><div class="eyebrow">TRACE INTELLIGENCE / 01</div><h1>What went wrong,<br><em>and what happens next.</em></h1><p>Trace evidence, candidate code, and repair history in one place.</p></div><div class="pulse"><span class="pulse-dot"></span> LIVE VIEW</div></div>
+      <section class="controls" aria-label="Filters">
+        <label>ACCESS TOKEN<input id="token" type="password" placeholder="Bearer token" autocomplete="off"></label>
+        <label>APP ID<input id="app-id" placeholder="All apps"></label>
+        <label>SESSION ID<input id="session-id" placeholder="All sessions"></label>
+        <label>WINDOW<select id="since"><option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option></select></label>
+        <button id="refresh" class="primary">Load diagnostics ↗</button>
+      </section>
+      <div id="message" role="status" aria-live="polite"></div>
+      <section class="stats" aria-label="Summary"><div><span>TRACES INSPECTED</span><strong id="trace-count">—</strong></div><div><span>FINDINGS</span><strong id="finding-count">—</strong></div><div><span>REPOSITORY</span><strong id="repository">—</strong></div><div><span>COMMIT</span><strong id="commit">—</strong></div></section>
+      <section class="findings"><div class="section-head"><div><div class="eyebrow">DIAGNOSTIC QUEUE</div><h2>Findings</h2></div><span id="updated">Awaiting scan</span></div><div class="table-wrap"><table><thead><tr><th>SEVERITY / TRACE</th><th>FAILURE</th><th>SUGGESTED NEXT STEP</th><th>REPAIR / PR</th><th>HANDOFF</th></tr></thead><tbody id="rows"><tr><td colspan="5" class="empty">Enter your server token and load diagnostics.</td></tr></tbody></table></div></section>
+      <p class="footnote">Suggestions are based on observed checks. Code locations are AST name matches and need human verification. Opening a PR requires a separately validated fix.</p>
+    </main>
+  </div>
+  <dialog id="resolution-dialog"><form method="dialog"><div class="eyebrow">REPAIR HISTORY</div><h2>Record progress</h2><p id="dialog-finding"></p><label>STATUS<select id="resolution-status"><option value="investigating">Investigating</option><option value="proposed">Proposed</option><option value="validated">Validated</option><option value="resolved">Resolved</option><option value="rejected">Rejected</option></select></label><label>NOTE<textarea id="resolution-note" maxlength="2000" rows="4" placeholder="What changed or what was learned?"></textarea></label><label>GITHUB PR URL<input id="resolution-pr" type="url" placeholder="https://github.com/org/repo/pull/123"></label><div class="dialog-actions"><button value="cancel">Cancel</button><button id="save-resolution" value="save" class="primary">Save record</button></div></form></dialog>
+</body>
+</html>

@@ -7,6 +7,7 @@ import os
 import threading
 import uuid
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
@@ -25,6 +26,21 @@ _active_trace: contextvars.ContextVar[Trace | None] = contextvars.ContextVar(
 _active_span: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "healer_active_span", default=None
 )
+_active_identity: contextvars.ContextVar[tuple[str, str] | None] = contextvars.ContextVar(
+    "healer_active_identity", default=None
+)
+
+
+@contextmanager
+def session(app_id: str, session_id: str):
+    """Attach a caller-owned app and chat/session ID to traces in this context."""
+    if not app_id or not session_id:
+        raise ValueError("app_id and session_id must be non-empty")
+    token = _active_identity.set((app_id, session_id))
+    try:
+        yield
+    finally:
+        _active_identity.reset(token)
 
 
 @dataclass(slots=True)
@@ -125,9 +141,9 @@ class Runtime:
         if self._neatlogs is not None:
             # The vendor decorator creates the Neatlogs span while our wrapper always
             # keeps the redacted local fallback needed when Public API reads are absent.
-            wrapped = self._neatlogs.span(kind=kind.upper(), name=name or function.__name__)(
-                wrapped
-            )
+            # Neatlogs 1.x accepts CHAIN, not LLM. Preserve LLM in the local trace.
+            vendor_kind = "CHAIN" if kind.upper() == "LLM" else kind.upper()
+            wrapped = self._neatlogs.span(kind=vendor_kind, name=name or function.__name__)(wrapped)
         return wrapped  # type: ignore[return-value]
 
     def _start(
@@ -140,6 +156,8 @@ class Runtime:
             tags=list(tags),
             attributes={"healer.instrumented": True},
         )
+        if parent_trace is None and (identity := _active_identity.get()) is not None:
+            trace.attributes.update({"app_id": identity[0], "session_id": identity[1]})
         span = Span(
             id=uuid.uuid4().hex,
             trace_id=trace.id,

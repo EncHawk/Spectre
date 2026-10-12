@@ -28,6 +28,13 @@ def _parser() -> argparse.ArgumentParser:
     scan.add_argument("--trace-id")
     scan.add_argument("--limit", type=int, default=100)
 
+    doctor = sub.add_parser("doctor", help="Join trace findings with local repository context")
+    doctor.add_argument("--repo", default=".")
+    doctor.add_argument("--since", default="24h")
+    doctor.add_argument("--app-id")
+    doctor.add_argument("--session-id")
+    doctor.add_argument("--limit", type=int, default=100)
+
     report = sub.add_parser("report", help="Write a report from a fresh scan")
     report.add_argument("--since", default="24h")
     report.add_argument("--tag")
@@ -76,6 +83,14 @@ def main(argv: list[str] | None = None) -> int:
                     "count": len(findings),
                     "findings": [finding.to_dict() for finding in findings],
                 }
+            elif args.command == "doctor":
+                payload = healer.doctor(
+                    repo_path=args.repo,
+                    since=args.since,
+                    app_id=args.app_id,
+                    session_id=args.session_id,
+                    limit=args.limit,
+                )
             elif args.command == "report":
                 findings = healer.scan(since=args.since, tag=args.tag)
                 report = build_report(findings)

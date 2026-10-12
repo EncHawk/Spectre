@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 from collections.abc import Iterable
 from pathlib import Path
@@ -21,6 +22,17 @@ class LocalTraceStore:
     def append(self, trace: Trace) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = self.redactor.redact(trace.to_dict())
+        # Trace/span IDs are generated opaque UUID hex values. Redacting the
+        # whole structure can mistake a run of hex digits for a payment card,
+        # destroying parent links and exact trace lookup.
+        opaque_id = re.compile(r"[a-f0-9]{32}\Z")
+        if opaque_id.fullmatch(trace.id):
+            payload["id"] = trace.id
+        for stored, original in zip(payload["spans"], trace.spans, strict=True):
+            for key in ("id", "trace_id", "parent_id"):
+                identifier = getattr(original, key)
+                if isinstance(identifier, str) and opaque_id.fullmatch(identifier):
+                    stored[key] = identifier
         line = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
         with self._lock, self.path.open("a", encoding="utf-8") as stream:
             stream.write(line + "\n")

@@ -46,6 +46,30 @@ answer = support_agent("order-123")
 
 Both sync and async functions are supported. Inputs, outputs, and errors are redacted before the local fallback log is written.
 
+## Doctor and dashboard
+
+Assign each chat an app and session ID, then run Doctor against a **local checkout** of its repository:
+
+```python
+with healer.session("support", "chat-42"):
+    support_agent("order-123")
+
+report = healer.doctor(repo_path="/path/to/support-repo", app_id="support", session_id="chat-42")
+for row in report["rows"]:
+    print(row["finding"]["reason"], row["suggestion"])
+    print(row["copy_to_agent"])
+```
+
+`healer --json doctor --repo /path/to/support-repo --app-id support --session-id chat-42` prints the same JSON. Doctor reads recent traces, runs the existing deterministic checks, and indexes up to 500 Git-tracked Python files with the standard-library AST parser. It returns candidate function locations and GitHub permalinks when `origin` is a GitHub remote and `HEAD` exists. It stores no source bodies or AST dump. A name match is a navigation hint, not a proven root cause. Without a GitHub remote, the local file and line still appear.
+
+The SDK writes `app_id` and `session_id` to its redacted local trace. For a filtered chat, Doctor prefers that record when present because Neatlogs' vendor trace may not carry these SDK-owned attributes. Unfiltered scans still use the configured Neatlogs read path when available. Cross-source trace ID correlation is not implemented yet.
+
+For the HTTP service, mount the checkout read-only (for example `-v /path/to/support-repo:/repo:ro`) and set `HEALER_REPO_PATH=/repo`. Open `/app/` for all recent findings or `/app/<app-id>/<session-id>` for one chat. The page asks for `HEALER_SERVER_TOKEN` in the browser and calls authenticated `GET /v1/doctor`. Its table shows evidence, suggestions, candidate code, resolution history, PR links, and **Copy to Agent** text that can be pasted into Codex, Claude Code, or another agent. The token is held in browser session storage; use a dedicated trusted browser session for this operator dashboard.
+
+Resolution updates are explicit: `healer.record_resolution(finding_id, status="investigating", note="...")` or authenticated `POST /v1/resolutions`. Events append to `.healer/resolutions.jsonl` locally, or `HEALER_RESOLUTION_LOG` in the service. A GitHub PR URL can be recorded after one exists. The Python dashboard does not create a PR: use `validate_candidate(...)` and then the existing explicit `open_pull_request(...)` call, which requires an accepted measured result. It does not connect to GitHub OAuth, clone a remote repository, or infer a fix from an AST match.
+
+The separate Next.js control plane in `frontend/` adds Google sign-in, GitHub OAuth repository snapshots, agent definitions, and a server-side bridge to Doctor. See [the integration handoff](backend/INTEGRATION_HANDOFF.md) for environment variables, callback URLs, API routes, verification, and current limits.
+
 ## Model providers
 
 Healer has a provider-neutral generation interface backed by each vendor's official Python SDK. Install only what you use, or install all adapters together:
@@ -110,7 +134,7 @@ docker run --rm -p 8080:8080 \
   spectre-healer:local
 ```
 
-The public `/healthz` and `/readyz` routes are suitable for Docker and load-balancer health checks. Authenticated endpoints are `GET /v1/status` and `GET`/`POST /v1/scan`. See the complete [EC2 and ECR deployment guide](deploy/ec2/README.md) and hardened [Compose definition](deploy/ec2/compose.yaml).
+The public `/healthz` and `/readyz` routes are suitable for Docker and load-balancer health checks. Authenticated endpoints are `GET /v1/status`, `GET`/`POST /v1/scan`, `GET /v1/doctor`, and `POST /v1/resolutions`. See the complete [EC2 and ECR deployment guide](deploy/ec2/README.md) and hardened [Compose definition](deploy/ec2/compose.yaml).
 
 ## Credentials and capability detection
 
