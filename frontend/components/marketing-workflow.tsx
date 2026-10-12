@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Check, Code2, GitBranch, ScanSearch, TriangleAlert } from "lucide-react";
 
 const steps = [
@@ -58,7 +57,7 @@ export function ProductWalkthrough() {
           const next = event.key === "Home" ? 0 : event.key === "End" ? steps.length - 1 : ["ArrowRight", "ArrowDown"].includes(event.key) ? (index + 1) % steps.length : ["ArrowLeft", "ArrowUp"].includes(event.key) ? (index + steps.length - 1) % steps.length : null;
           if (next !== null) { event.preventDefault(); setActive(next); tabs.current[next]?.focus(); }
         }} aria-controls="workflow-panel" id={`workflow-tab-${index}`} key={step.name} onClick={() => setActive(index)} className={`rounded-2xl border p-4 text-left transition lg:p-5 ${active === index ? "border-blue-400/50 bg-blue-500/10" : "border-white/10 hover:bg-white/5"}`}><span className="mono text-[10px] text-white/40">0{index + 1}</span><span className="ml-3 text-sm font-medium">{step.name}</span><span className={`mt-3 hidden text-xs leading-6 lg:block ${active === index ? "text-white/65" : "text-white/35"}`}>{step.copy}</span></button>)}</div>
-        <div className="min-w-0"><div className="overflow-hidden rounded-3xl border border-white/15 bg-[#141820] shadow-2xl"><div className="flex items-center justify-between border-b border-white/10 px-5 py-4"><span className="mono text-[10px] text-white/40">spectre / {steps[active].name.toLowerCase()}</span><span className="text-[10px] text-white/40">Workflow example</span></div><div id="workflow-panel" role="tabpanel" aria-labelledby={`workflow-tab-${active}`}><AnimatePresence mode="wait"><motion.div key={active} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}><View /></motion.div></AnimatePresence></div></div><h3 className="mt-6 text-xl font-medium">{steps[active].title}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-white/50 lg:hidden">{steps[active].copy}</p></div>
+        <div className="min-w-0"><div className="overflow-hidden rounded-3xl border border-white/15 bg-[#141820] shadow-2xl"><div className="flex items-center justify-between border-b border-white/10 px-5 py-4"><span className="mono text-[10px] text-white/60">spectre / {steps[active].name.toLowerCase()}</span><span className="text-[10px] text-white/60">Workflow example</span></div><div id="workflow-panel" role="tabpanel" aria-labelledby={`workflow-tab-${active}`}><div key={active} className="workflow-view"><View /></div></div></div><h3 className="mt-6 text-xl font-medium">{steps[active].title}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-white/60 lg:hidden">{steps[active].copy}</p></div>
       </div>
     </div>
   </section>;

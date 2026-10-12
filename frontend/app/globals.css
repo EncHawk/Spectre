@@ -70,18 +70,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 
 .hero-scenic {
-  background-position: center 54%;
-  background-repeat: no-repeat;
-  background-size: cover;
   transform: translateZ(0);
-}
-
-.hero-scenic::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, rgb(219 234 254 / .12), transparent 42%, rgb(37 99 235 / .06));
-  pointer-events: none;
 }
 
 .scenic-mask {
@@ -104,6 +93,44 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .hero-grain {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
   mix-blend-mode: soft-light;
+}
+
+.hero-bird {
+  animation: bird-flight 30s linear infinite;
+  will-change: transform;
+}
+
+.hero-bird-2 { animation-duration: 38s; animation-delay: -14s; }
+.hero-bird-3 { animation-duration: 33s; animation-delay: -22s; }
+.hero-bird-4 { animation-duration: 44s; animation-delay: -8s; }
+
+.hero-bird-bob { animation: bird-bob 3s ease-in-out infinite; }
+.hero-bird-2 .hero-bird-bob { animation-duration: 3.4s; }
+.hero-bird-3 .hero-bird-bob { animation-duration: 2.8s; }
+.hero-bird-4 .hero-bird-bob { animation-duration: 3.7s; }
+
+@keyframes bird-flight {
+  from { transform: translate3d(-12vw, 0, 0); }
+  to { transform: translate3d(112vw, 0, 0); }
+}
+
+@keyframes bird-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+.workflow-view { animation: workflow-enter .18s ease-out both; }
+
+@keyframes workflow-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.footer-aurora {
+  background:
+    radial-gradient(80% 160% at 12% 110%, rgb(96 165 250 / .9), transparent 58%),
+    radial-gradient(90% 180% at 88% -30%, rgb(30 58 138 / .95), transparent 60%),
+    linear-gradient(115deg, #1e3a8a, #2563eb 52%, #60a5fa);
 }
 
 .fantasy-background {
@@ -151,4 +178,5 @@ button, a { -webkit-tap-highlight-color: transparent; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
   .scroll-float { transform: none !important; transition: none !important; }
+  .hero-bird { transform: translate3d(12vw, 0, 0); }
 }
