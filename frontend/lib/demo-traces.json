@@ -1,0 +1,134 @@
+{
+  "source": "backend/tests/test_competitor_agent.py (deterministic FakeParallel runs)",
+  "raw_finding_count": 9,
+  "runs": [
+    {
+      "trace_id": "6dc77fe9fe6a4c2fb721f1e1346ef3ce",
+      "session_id": "demo-acme-research",
+      "name": "competitor_research_agent",
+      "status": "ok",
+      "source": "local test fixture",
+      "started_at": "2026-10-12T14:31:51.983512+00:00",
+      "trace_url": null,
+      "spans_truncated": false,
+      "scenario": "Acme competitor research",
+      "input": "Research competitors for acme.test; limit 1",
+      "summary": "Report returned Rival as a lead, but multiple company claims lacked field-level citations.",
+      "spans": [
+        {
+          "id": "3aa2b9aa161041929ebba2684b5dfcd5",
+          "parent_id": null,
+          "name": "run",
+          "kind": "AGENT",
+          "status": "ok",
+          "input": "{'args': ['acme.test', 1], 'kwargs': {}}",
+          "output": "{'goal': 'Find and evidence direct competitor leads for the supplied website', 'website': 'https://acme.test', 'subject': {'name': 'Acme', 'what_they_do': 'Agent observability', 'product': 'Agent trace analysis', 'icp': 'AI teams', 'problem_solved': 'Finding broken agent runs'}, 'subject_evidence': {'name': {'sources': [], 'confidence': None}, 'what_they_do': {'sources': [], 'confidence': None}, 'product': {'sources'",
+          "error": null
+        },
+        {
+          "id": "e8966e312a9f4bf092dffc76ba6cc304",
+          "parent_id": "3aa2b9aa161041929ebba2684b5dfcd5",
+          "name": "profile_site",
+          "kind": "TOOL",
+          "status": "ok",
+          "input": "{'args': ['https://acme.test'], 'kwargs': {}}",
+          "output": "{'content': {'name': 'Acme', 'what_they_do': 'Agent observability', 'product': 'Agent trace analysis', 'icp': 'AI teams', 'problem_solved': 'Finding broken agent runs'}, 'basis': [{'field': 'product', 'citations': [{'url': 'https://acme.test/product'}], 'confidence': 'high'}], 'run_id': 'run-1'}",
+          "error": null
+        },
+        {
+          "id": "3f4b2b0f2e0f4eb3aeca320f13868392",
+          "parent_id": "3aa2b9aa161041929ebba2684b5dfcd5",
+          "name": "discover_competitors",
+          "kind": "TOOL",
+          "status": "ok",
+          "input": "{'args': ['https://acme.test', {'content': {'name': 'Acme', 'what_they_do': 'Agent observability', 'product': 'Agent trace analysis', 'icp': 'AI teams', 'problem_solved': 'Finding broken agent runs'}, 'basis': [{'field': 'product', 'citations': [{'url': 'https://acme.test/product'}], 'confidence': 'high'}], 'run_id': 'run-1'}, 100], 'kwargs': {}}",
+          "output": "[{'name': 'Unrelated', 'website': 'https://unrelated.test', 'description': 'Name: Unrelated | Website Url: https://unrelated.test | Payments'}, {'name': 'Rival', 'website': 'https://rival.test', 'description': 'Name: Rival | Website Url: https://rival.test | Tracing'}]",
+          "error": null
+        },
+        {
+          "id": "465e4dec09454eebb187d7f725d5ed60",
+          "parent_id": "3aa2b9aa161041929ebba2684b5dfcd5",
+          "name": "rank_candidates",
+          "kind": "TOOL",
+          "status": "ok",
+          "input": "{'args': [{'content': {'name': 'Acme', 'what_they_do': 'Agent observability', 'product': 'Agent trace analysis', 'icp': 'AI teams', 'problem_solved': 'Finding broken agent runs'}, 'basis': [{'field': 'product', 'citations': [{'url': 'https://acme.test/product'}], 'confidence': 'high'}], 'run_id': 'run-1'}, [{'name': 'Unrelated', 'website': 'https://unrelated.test', 'description': 'Name: Unrelated | Website Url: https",
+          "output": "[{'name': 'Unrelated', 'website': 'https://unrelated.test', 'description': 'Name: Unrelated | Website Url: https://unrelated.test | Payments'}, {'name': 'Rival', 'website': 'https://rival.test', 'description': 'Name: Rival | Website Url: https://rival.test | Tracing'}]",
+          "error": null
+        },
+        {
+          "id": "ff04a30ab2a043268c9ce7447540b39e",
+          "parent_id": "3aa2b9aa161041929ebba2684b5dfcd5",
+          "name": "research_competitor",
+          "kind": "TOOL",
+          "status": "ok",
+          "input": "{'args': [{'name': 'Acme', 'what_they_do': 'Agent observability', 'product': 'Agent trace analysis', 'icp': 'AI teams', 'problem_solved': 'Finding broken agent runs'}, {'name': 'Unrelated', 'website': 'https://unrelated.test', 'description': 'Name: Unrelated | Website Url: https://unrelated.test | Payments'}], 'kwargs': {}}",
+          "output": "{'name': 'Unrelated', 'website': 'https://unrelated.test', 'is_competitor': False, 'why_competitor': 'Different market', 'what_they_do': 'Payments', 'product': 'Checkout', 'icp': 'Stores', 'problem_solved': 'Payments', 'growth_unknowns': [], 'parallel_run_id': 'run-2', 'evidence': {'why_competitor': {'sources': [], 'confidence': None}, 'what_they_do': {'sources': [], 'confidence': None}, 'product': {'sources': [], 'c",
+          "error": null
+        },
+        {
+          "id": "d87b0b48d0f8465e9864e13af32f5f67",
+          "parent_id": "3aa2b9aa161041929ebba2684b5dfcd5",
+          "name": "research_competitor",
+          "kind": "TOOL",
+          "status": "ok",
+          "input": "{'args': [{'name': 'Acme', 'what_they_do': 'Agent observability', 'product': 'Agent trace analysis', 'icp': 'AI teams', 'problem_solved': 'Finding broken agent runs'}, {'name': 'Rival', 'website': 'https://rival.test', 'description': 'Name: Rival | Website Url: https://rival.test | Tracing'}], 'kwargs': {}}",
+          "output": "{'name': 'Rival', 'website': 'https://rival.test', 'is_competitor': True, 'why_competitor': 'Agent trace analysis for AI teams', 'what_they_do': 'Agent observability', 'product': 'Trace dashboard', 'icp': 'AI teams', 'problem_solved': 'Finding broken agent runs', 'growth_unknowns': ['Revenue growth rate'], 'parallel_run_id': 'run-3', 'evidence': {'why_competitor': {'sources': ['https://rival.test/product'], 'confiden",
+          "error": null
+        }
+      ]
+    },
+    {
+      "trace_id": "4162187d9382470b8181d313ae64ca59",
+      "session_id": "demo-parallel-failure",
+      "name": "competitor_research_agent",
+      "status": "error",
+      "source": "local test fixture",
+      "started_at": "2026-10-12T14:31:51.987213+00:00",
+      "trace_url": null,
+      "spans_truncated": false,
+      "scenario": "Parallel task failure",
+      "input": "Research competitors for acme.test; limit 1",
+      "summary": "Parallel research failed on the first profile task; no fallback report was produced.",
+      "spans": [
+        {
+          "id": "cd466352ab584335933139222a71de00",
+          "parent_id": null,
+          "name": "run",
+          "kind": "AGENT",
+          "status": "error",
+          "input": "{'args': ['acme.test', 1], 'kwargs': {}}",
+          "output": "None",
+          "error": "RuntimeError: Parallel research failed"
+        },
+        {
+          "id": "c1e503af792f41269b4ead7ee38e0790",
+          "parent_id": "cd466352ab584335933139222a71de00",
+          "name": "profile_site",
+          "kind": "TOOL",
+          "status": "error",
+          "input": "{'args': ['https://acme.test'], 'kwargs': {}}",
+          "output": "None",
+          "error": "RuntimeError: Parallel research failed"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "26dc9c4cc3e9ebdd",
+      "check": "competitor_evidence",
+      "reason": "subject.what_they_do: Claim has no source URL.",
+      "trace_id": "6dc77fe9fe6a4c2fb721f1e1346ef3ce",
+      "span_id": "3aa2b9aa161041929ebba2684b5dfcd5",
+      "severity": "medium"
+    },
+    {
+      "id": "969818bd0a068ee7",
+      "check": "no_recovery",
+      "reason": "Run ended after 'profile_site' failed; no fallback or successful retry was recorded.",
+      "trace_id": "4162187d9382470b8181d313ae64ca59",
+      "span_id": "c1e503af792f41269b4ead7ee38e0790",
+      "severity": "medium"
+    }
+  ]
+}

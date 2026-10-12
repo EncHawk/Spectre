@@ -1,83 +1,57 @@
-# Spectre, in one read
+# Spectre architecture and developer guide
 
-Spectre helps a team understand why an AI agent failed and prepare a safer fix. The intended loop is:
+Spectre collects AI agent traces, runs deterministic checks, and helps an operator investigate observed failures. The current signed-in workspace starts with a NeatLogs connection: a user saves a service-account read token, chooses a project and a workflow found in its traces, then inspects runs and findings. The Python SDK also supports local instrumentation, repository-aware Doctor reports, example agents, and opt-in repair APIs.
 
-**Run an agent → record its steps → find a failure → investigate the trace and related code → suggest a fix and a way to verify it.**
+## The active data path
 
-Today, the Python SDK handles tracing, checks, test cases, investigations, and an optional GEPA adversary loop. The web app handles sign-in, GitHub repository snapshots, agent definitions, run inspection, two runnable LangGraph examples, and investigation requests. Older repair and PR functions remain in the SDK. A linked agent's own code must already send traces to Spectre; linking it in the UI does not execute that repository.
+1. The Next.js app signs a user in with Google and stores a hashed session in its SQLite database. `/app` requires that session.
+2. The user supplies a NeatLogs service-account token in `/app`. The Next server encrypts it with `SPECTRE_ENCRYPTION_KEY` before saving it; browser APIs return connection status, project names, and selected workflows, never the saved token.
+3. Next asks the Python service to list projects and distinct trace `workflowName` values. It saves selected `(project_id, workflow_name)` pairs for that user.
+4. A report request checks ownership of the selected pair, then calls Python `POST /v1/neatlogs/doctor`. The Python service reads NeatLogs with the user's token and caches redacted traces by user, project, workflow, and trace ID. Subsequent syncs request traces from five minutes before the last successful sync to cover late arrivals and deduplicate by trace ID.
+5. Doctor runs deterministic checks over the cached traces. The browser shows runs, findings, and a copyable handoff. `POST /v1/neatlogs/investigations` analyzes a selected finding and returns evidence, a likely-cause hypothesis, a suggested fix, and verification steps. This path does not edit source code.
 
-## What someone can do today
+The NeatLogs token needs `context:read` and `observability:read` for the projects bound to its service account. The Next server calls the Python service with `HEALER_SERVER_TOKEN`; the browser never receives that service token. The Python service also offers SDK/local-trace routes, repository-aware Doctor reports, bundled LangGraph examples, and a Postgres-backed project-key control API. Those are separate paths from the NeatLogs workspace above.
 
-1. **Connect:** Sign in with Google, connect GitHub, pin a repository commit, and define an agent with an `app_id`.
-2. **Observe:** Instrument an agent with `healer.agent`, `healer.tool`, and `healer.session(app_id, session_id)`. Spectre records redacted spans locally and can send/read Neatlogs traces when configured.
-3. **Investigate:** Select the agent in the web app to see successful and failed runs, steps, findings, code candidates, an observed invocation path, possible Python call edges, and a summary to copy into a coding agent.
-4. **Challenge it:** Run the checkout-support and research-brief LangGraph examples from the web app. Each compares flawed and repaired behavior against three task contracts. Both scored **1/3 before and 3/3 after** in local tests. These examples use fixture tools, not live payment or research services.
-5. **Suggest a fix:** In the Investigation tab, select a finding. Spectre uses its measured trace, candidate code, and possible call edges to return a likely cause, suggested fix, and replay plan. OpenAI can refine the explanation when configured; otherwise a rule-based suggestion appears. No code is changed.
-6. **Evolve attacks:** A developer can call `evolve_prompts` with an agent runner and task-contract probe. GEPA searches for prompts that produce measured contract failures, either before a known failure or using one as context. This is a Python API; the frontend does not launch arbitrary linked agents yet.
+## Source map
 
-The scanner detects repeated calls, ignored errors, missing recovery, loops, empty answers, unsupported claims, missing lookups, and unusual cost. A task-specific contract can catch failures the generic scanner misses, such as a retrieved page injecting an unsupported claim.
+| Path | Responsibility |
+| --- | --- |
+| `frontend/app/app/page.tsx`, `frontend/components/neatlogs-workspace.tsx` | Signed-in NeatLogs project, workflow, run, and finding views. |
+| `frontend/app/api/neatlogs/` | Session and ownership checks; connection, discovery, report, and investigation routes. |
+| `frontend/lib/server/auth.ts`, `db.ts`, `neatlogs.ts` | Sessions, SQLite schema and token encryption, saved NeatLogs connections, backend requests. |
+| `frontend/lib/server/backend.ts`, `control.ts`, `github.ts` | Python service URL, project-key control calls, and GitHub integration. |
+| `backend/src/healer/server.py` | HTTP routes, bearer-token checks, service orchestration. |
+| `backend/src/healer/neatlogs_client.py`, `neatlogs_cache.py` | NeatLogs Public API reads and incremental redacted trace cache. |
+| `backend/src/healer/doctor.py`, `checks.py`, `investigation.py` | Report construction, deterministic findings, and suggested investigation. |
+| `backend/src/healer/runtime.py`, `store.py`, `privacy.py` | Python SDK instrumentation, local trace storage, and redaction. |
+| `backend/src/healer/repository_ingest.py`, `code_graph.py` | Pinned repository snapshots and candidate Python source locations for the repository-aware path. |
+| `backend/src/healer/control_db.py`, `backend/db/` | Postgres projects and hashed API keys. |
+| `backend/tests/`, `frontend/tests/smoke.py` | Python unit and HTTP tests, plus frontend HTTP smoke coverage. |
 
-## What remains to build or verify
+The frontend still contains GitHub, project-key, example-lab, and older agent routes. They support other flows; they are not prerequisites for the current `/app` NeatLogs view. `frontend/lib/sample-data.ts` and some components are retained for those legacy/demo views. Untracked files in a checkout are local work and are not part of this guide's source map.
 
-- **Run any linked repository agent from the UI:** needs an isolated job worker, a reviewed entrypoint, secret references, limits, and captured test results. The current run button is for the two bundled examples.
-- **Run an adversary against any linked agent from the UI:** needs the same controlled job runner plus a task-specific pass/fail contract. The current GEPA loop is callable from Python with a supplied probe.
-- **Live integrations:** the local tests and frontend smoke pass. Google/GitHub consent, private repository ingest, Neatlogs export, and an OpenAI request still need real credentials and live checks.
-- **Production scale:** the current SQLite control plane and local trace/checkout stores are single-instance. The Docker image installs provider and Neatlogs extras but currently omits the optional LangGraph `lab` extra.
+## Run locally
 
-## Technology in plain English
+Use the service-specific templates in `backend/.env.example` and `frontend/.env.example`. Keep secrets in `backend/.env` and `frontend/.env.local`.
 
-| Layer | Technology | Why it is here |
-| --- | --- | --- |
-| Agent SDK and API | Python 3.12+, standard-library HTTP server | Wrap agent/tool calls, store traces, scan failures, expose results. |
-| Trace service | Neatlogs, with a redacted JSONL fallback | Capture and inspect execution steps. |
-| Example workflows | LangGraph | Show real multi-step graph execution and red-team comparisons. |
-| Investigation | OpenAI Responses API with a rule-based fallback | Explain likely causes and suggest a fix and verification from measured evidence. |
-| Adversary | GEPA optional extra and a caller-supplied contract probe | Evolve prompts and count only executed contract failures. |
-| Web app | Next.js, React, TypeScript, Tailwind CSS | Account connection, repository/agent setup, run and finding views. |
-| Identity and data | Google OAuth, GitHub OAuth, SQLite, encrypted GitHub token | Sign-in, repository access, and agent definitions. |
-| Shipping and quality | Docker, EC2/ECR guide, pytest, Ruff, frontend smoke test | Run the API and check behavior. |
+```sh
+make setup
+make migrate
+make serve
+# In a second terminal
+cd frontend && npm install && npm run dev
+```
 
-## Directory and file guide
+Set the same `HEALER_SERVER_TOKEN` on both services. Set `HEALER_API_URL=http://127.0.0.1:8080` in the frontend environment for a local Python service. The frontend otherwise uses its configured hosted backend. The frontend also needs Google OAuth credentials, an allowed email, `SPECTRE_ENCRYPTION_KEY`, and a writable `SPECTRE_DB_PATH`; the Python service owns `DATABASE_URL` and provider keys. See [README.md](README.md), [backend/README.md](backend/README.md), and [backend/INTEGRATION_HANDOFF.md](backend/INTEGRATION_HANDOFF.md) for the broader SDK and control-plane flows.
 
-Files below are the **tracked project files**, grouped so the map stays readable. Names within a row share the purpose shown at right.
+## Checks
 
-| Directory | Files | Purpose |
-| --- | --- | --- |
-| Root | `docs.md`, `README.md`, `INTENT.md`, `hackathon.md` | This overview, technical guide, original idea, and build log. |
-| `backend/` setup | `pyproject.toml`, `uv.lock`, `Makefile`, `Dockerfile`, `.env.example`, `.dockerignore` | Python dependencies, commands, image, and configuration templates. Root Makefile delegates backend commands. |
-| Tool metadata | `.codex/hooks.json`, `.entire/settings.json`, `.entire/.gitignore` | Local Codex and Entire integration settings. |
-| `backend/` | `SPEC.md`, `DOCTOR.md`, `INTEGRATION_HANDOFF.md` | Product contract, Doctor notes, and the detailed developer handoff. |
-| `backend/business/` | `inputs.json` | Measured business inputs; unknown business values remain unset. |
-| `backend/deploy/ec2/` | `README.md`, `compose.yaml`, `.env.example` | EC2/ECR deployment steps, Compose settings, and server env template. |
-| `backend/evidence/` | `.gitkeep`; `demo/report.json`, `demo/report.md`, `demo/runs.jsonl` | Kept demo traces and reports. |
-| `backend/examples/research_agent/` | `agent.py` | Small deliberately flawed agent for the basic demo. |
-| `backend/examples/langgraph_lab/` | `__init__.py`, `__main__.py`, `README.md` | Runnable entry point and explanation for the two graph examples. |
-| `frontend/` | `package.json`, `package-lock.json`, `tsconfig.json`, `next.config.ts`, `next-env.d.ts`, `postcss.config.mjs`, `.gitignore`, `AGENTS.md`, `DOCTOR_HANDOFF.md` | Web dependencies, build configuration, local rules, and UI handoff. |
-| `frontend/app/` | `layout.tsx`, `page.tsx`, `globals.css` | Global layout, public landing page, and styles. |
-| `frontend/app/app/` | `layout.tsx`, `page.tsx`; `investigation/page.tsx`, `sessions/page.tsx`, `sessions/[sessionId]/page.tsx` | Signed-in shell, Investigation tab, and control-plane routes. |
-| `frontend/app/api/auth/google/` | `start/route.ts`, `callback/route.ts` | Google sign-in start and callback. |
-| `frontend/app/api/auth/github/` | `start/route.ts`, `callback/route.ts` | GitHub connection start and callback. |
-| `frontend/app/api/auth/logout/` | `route.ts` | End the signed-in session. |
-| `frontend/app/api/` | `me/route.ts`, `repositories/route.ts`, `agents/route.ts`, `doctor/route.ts` | Current user, pinned repositories, agent definitions, and Doctor report. |
-| `frontend/app/api/` | `backend/examples/route.ts`, `example-runs/route.ts`, `investigations/route.ts`, `proposals/route.ts` | List/run bundled graphs, request an investigation, and retain the older draft API. |
-| `frontend/components/` | `control-plane.tsx`, `investigation-panel.tsx`, `observed-runs.tsx`, `example-lab.tsx`, `approval-panel.tsx`, `session-list.tsx`, `status-pill.tsx` | Main workspace, investigation results, run detail, red-team lab, and supporting views. |
-| `frontend/components/` | `dashboard-shell.tsx`, `marketing-home.tsx`, `repository-prompt.tsx`, `logo.tsx` | Navigation, landing page, repository prompt, and branding. |
-| `frontend/components/reactbits/` | `aurora.tsx`, `blur-text.tsx`, `magnet.tsx` | Visual effects on the public site. |
-| `frontend/lib/` | `sample-data.ts` | Legacy presentation data; the control plane uses backend data. |
-| `frontend/lib/server/` | `auth.ts`, `backend.ts`, `db.ts`, `github.ts` | Session/security helpers, Python API bridge, SQLite, and GitHub API logic. |
-| `frontend/public/images/` | `spectre-foreground-mountain.png`, `spectre-meadow.png`, `spectre-river-base-v2.png`, `spectre-river-fantasy.png`, `spectre-valley-base.webp`, `spectre-valley-near.webp`, `spectre-valley.png` | Public site artwork. |
-| `frontend/tests/` | `smoke.py` | Local HTTP test for auth, ownership, Doctor, example runs, and investigations. |
-| `backend/src/healer/` | `__init__.py`, `__main__.py`, `cli.py`, `server.py` | Public SDK, module entry point, CLI, and Python HTTP API. |
-| `backend/src/healer/` | `runtime.py`, `models.py`, `store.py`, `privacy.py`, `timeutil.py`, `errors.py` | Instrumentation, data types, local storage, redaction, time parsing, and errors. |
-| `backend/src/healer/` | `neatlogs_client.py`, `scanner.py`, `checks.py`, `causes.py` | Neatlogs reads, finding generation, individual checks, and cause grouping. |
-| `backend/src/healer/` | `doctor.py`, `investigation.py`, `code_graph.py`, `repository_ingest.py` | Join runs to repository context, explain findings, infer possible Python calls, and fetch pinned GitHub checkouts. |
-| `backend/src/healer/` | `lab_agents.py`, `lab_runner.py`, `adversarial.py`, `adversary.py`, `replay.py` | Two LangGraph agents, their test runner, attack inputs, GEPA prompt search, and tool replay. |
-| `backend/src/healer/` | `fixes.py`, `regression.py`, `pull_request.py`, `report.py`, `demo.py`, `sponsors.py` | Draft/apply fixes, score changes, guard PRs, create reports, run demo, and export sponsor inputs. |
-| `backend/src/healer/` | `dashboard.html`, `dashboard.css`, `dashboard.js` | Small operator dashboard served by the Python API. |
-| `backend/src/healer/providers/` | `__init__.py`, `base.py`, `registry.py`, `openai.py`, `groq.py`, `anthropic.py`, `google.py` | Shared model interface and provider adapters. |
-| `backend/tests/` | `test_adversary.py`, `test_checks.py`, `test_code_graph.py`, `test_doctor.py`, `test_flows.py`, `test_investigation.py`, `test_langgraph_lab.py`, `test_neatlogs_client.py`, `test_privacy.py` | Adversary, scanner, graph, Doctor, repair loop, investigation, lab, Neatlogs, and redaction tests. |
-| `backend/tests/` | `test_providers.py`, `test_repository_ingest.py`, `test_runtime.py`, `test_server.py`, `test_store_ids.py`, `test_time_store.py` | Provider, checkout, tracing, API, ID, and time/storage tests. |
+```sh
+cd backend
+.venv/bin/python -m pytest
+.venv/bin/ruff check src tests examples db
+cd ..
+cd frontend && npm run typecheck
+```
 
-Local folders such as `backend/.venv/`, `frontend/node_modules/`, `frontend/.next/`, `backend/dist/`, `backend/.healer/`, `backend/.pytest_cache/`, `backend/.ruff_cache/`, and `.entire/logs/` are generated dependencies, builds, traces, or caches. The untracked `backend/plus_usage/` experiment (`__init__.py`, `agent.py`, `checks.py`, `README.md`, `requirements.txt`) and `backend/tests/test_competitor_agent.py` are separate local work, not part of the shipped source inventory.
-
-For setup commands and API details, read [README.md](README.md). For the exact frontend/backend contract and the remaining job-runner work, read [backend/INTEGRATION_HANDOFF.md](backend/INTEGRATION_HANDOFF.md).
+Database integration tests need `TEST_DATABASE_URL`. The frontend HTTP smoke script is in `frontend/tests/smoke.py` and needs a running Next server. Neither local unit tests nor TypeScript typechecking proves that live Google, GitHub, NeatLogs, or provider credentials work.

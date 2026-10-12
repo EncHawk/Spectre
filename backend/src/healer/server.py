@@ -16,8 +16,8 @@ from uuid import uuid4
 from .control_db import ControlDB, InvalidInput, NotFound
 from .errors import AuthenticationError, ConfigurationError, HealerError, PermissionDeniedError
 from .investigation import investigate_finding
-from .neatlogs_client import NeatlogsClient
 from .neatlogs_cache import NeatlogsTraceCache
+from .neatlogs_client import NeatlogsClient
 from .repository_ingest import RepositoryRegistry
 
 _MAX_BODY_BYTES = 64 * 1024
@@ -172,12 +172,17 @@ class HealerService:
         client = self.neatlogs_client(options)
         workflow_name = options.get("workflow_name")
         user_id = options.get("user_id")
-        if not isinstance(workflow_name, str) or not workflow_name or not isinstance(user_id, str) or not user_id:
+        if (
+            not isinstance(workflow_name, str)
+            or not workflow_name
+            or not isinstance(user_id, str)
+            or not user_id
+        ):
             raise ValueError("User and workflow are required")
         traces = NeatlogsTraceCache(self.settings.neatlogs_cache).sync(
-            user_id, client.project_id, workflow_name, client)
-        return doctor(repo_path=None, traces_override=traces, limit=1000,
-                      resolution_log=None)
+            user_id, client.project_id, workflow_name, client
+        )
+        return doctor(repo_path=None, traces_override=traces, limit=1000, resolution_log=None)
 
     def neatlogs_investigate(self, options: dict[str, Any]) -> dict[str, Any]:
         finding_id = str(options.get("finding_id", ""))
