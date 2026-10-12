@@ -40,7 +40,9 @@ class ServerSettings:
         port: int | None = None,
         allow_unauthenticated: bool = False,
     ) -> ServerSettings:
-        configured_port = port if port is not None else int(os.getenv("HEALER_PORT", "8080"))
+        configured_port = port if port is not None else int(
+            os.getenv("PORT") or os.getenv("HEALER_PORT", "8080")
+        )
         token = os.getenv("HEALER_SERVER_TOKEN") or None
         allowed = allow_unauthenticated or os.getenv(
             "HEALER_ALLOW_UNAUTHENTICATED", ""

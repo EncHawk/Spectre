@@ -166,3 +166,12 @@ def test_server_requires_explicit_auth_choice(monkeypatch):
 
     settings = ServerSettings.from_environment(allow_unauthenticated=True)
     assert settings.allow_unauthenticated
+
+
+def test_server_uses_platform_port(monkeypatch):
+    monkeypatch.setenv("HEALER_SERVER_TOKEN", "secret-token")
+    monkeypatch.setenv("HEALER_PORT", "8080")
+    monkeypatch.setenv("PORT", "10000")
+
+    assert ServerSettings.from_environment().port == 10000
+    assert ServerSettings.from_environment(port=9000).port == 9000

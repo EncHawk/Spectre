@@ -39,7 +39,7 @@ VOLUME ["/data"]
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD ["python", "-c", "import os,urllib.request; urllib.request.urlopen(f\"http://127.0.0.1:{os.getenv('HEALER_PORT', '8080')}/healthz\", timeout=2).read()"]
+    CMD ["python", "-c", "import os,urllib.request; port=os.getenv('PORT') or os.getenv('HEALER_PORT', '8080'); urllib.request.urlopen(f'http://127.0.0.1:{port}/healthz', timeout=2).read()"]
 
 ENTRYPOINT ["healer"]
-CMD ["serve"]
+CMD ["serve", "--host", "0.0.0.0"]
