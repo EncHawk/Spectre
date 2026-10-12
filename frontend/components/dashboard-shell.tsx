@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Boxes, GitBranch, LayoutDashboard, Menu, TestTubeDiagonal, X } from "lucide-react";
+import { BookOpen, Boxes, GitBranch, KeyRound, LayoutDashboard, Menu, TestTubeDiagonal, X } from "lucide-react";
 import { useState } from "react";
 import { Logo } from "./logo";
 
 const navigation = [
   { href: "/app", label: "Overview", icon: LayoutDashboard, exact: true },
-  { href: "/app/sessions", label: "Findings", icon: TestTubeDiagonal },
+  { href: "/app/investigation", label: "Investigation", icon: TestTubeDiagonal },
   { href: "/app#repositories", label: "Repositories", icon: GitBranch },
   { href: "/app#agents", label: "Agents", icon: Boxes },
+  { href: "/app#project-keys", label: "API keys", icon: KeyRound },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -26,7 +27,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           {navigation.map((item) => {
             const active = item.exact
               ? pathname === item.href
-              : item.href === "/app/sessions" && pathname.startsWith("/app/sessions");
+              : item.href === "/app/investigation" && pathname.startsWith("/app/investigation");
             const Icon = item.icon;
             return <Link onClick={() => setOpen(false)} key={item.label} href={item.href} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${active ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`}><Icon size={17} />{item.label}</Link>;
           })}

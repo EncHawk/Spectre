@@ -2,7 +2,7 @@
 
 > Update 2026-10-12: the Next control plane now has Google login, GitHub repository snapshots, agent definitions, a server-side Doctor bridge, two runnable LangGraph fixture agents, and OpenAI draft proposals for findings on pinned checkouts. See [`backend/INTEGRATION_HANDOFF.md`](../backend/INTEGRATION_HANDOFF.md) for the current setup, observed results, and remaining live verification. The prototype notes below are retained for the original Doctor API contract.
 
-Read this file before wiring the Next.js UI. The backend's single code reference is [`src/healer/doctor.py`](../src/healer/doctor.py); it contains the report shape, AST matching, suggestions, and repair history. The current Next.js pages under `frontend/app/app/` still use `frontend/lib/sample-data.ts`. A separate working reference UI is served by the Python service at `/app/` from `src/healer/dashboard.html` and `dashboard.js`.
+Read this file before wiring the Next.js UI. The backend's single code reference is [`backend/src/healer/doctor.py`](../backend/src/healer/doctor.py); it contains the report shape, AST matching, suggestions, and repair history. The current Next.js pages under `frontend/app/app/` still use `frontend/lib/sample-data.ts`. A separate working reference UI is served by the Python service at `/app/` from `backend/src/healer/dashboard.html` and `dashboard.js`.
 
 ## Small change log
 

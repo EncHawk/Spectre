@@ -253,8 +253,8 @@ def doctor(
             f"Candidate code: {code_refs}. "
             f"Observed invocation path: {' -> '.join(invocation_path) or 'unavailable'}. "
             f"Possible static call edges: {json.dumps(related_calls)}. "
-            "Verify the root cause, make a minimal fix, run relevant regression tests, "
-            "and open a PR only after validation."
+            "Verify the root cause and test the suggested change against the failing input. "
+            "Treat this as an investigation, not a confirmed fix."
         )
         rows.append(
             redactor.redact(

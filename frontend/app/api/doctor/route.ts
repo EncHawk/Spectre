@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         `Observed: ${row.finding.reason}. Suggested check: ${row.suggestion}. Connect a repository before editing code.`;
       row.copy_to_agent = `${evidence}\nAgent definition: ${agent.name} (${agent.app_id}). Intent: ${agent.description}. ` +
         `Pinned repository: ${repo?.full_name || "not connected"} at ${repo?.commit_sha || "unknown commit"}. ` +
-        `Verify the root cause, run relevant tests, and summarize evidence before proposing a PR.`;
+        `Verify the root cause, test the suggested change, and summarize the evidence.`;
     }
     return NextResponse.json({ agent: { app_id: agent.app_id, name: agent.name, description: agent.description }, repository: repo,
       generated_at: report.generated_at, trace_count: report.trace_count, finding_count: report.finding_count, rows: report.rows, runs: report.runs || [] },

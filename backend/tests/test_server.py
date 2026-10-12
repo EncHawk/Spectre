@@ -37,6 +37,12 @@ class Service:
     def propose(self, options):
         return {"proposal": {"status": "proposed"}, "finding_id": options["finding_id"]}
 
+    def investigate(self, options):
+        return {
+            "evidence": {"finding_id": options["finding_id"]},
+            "suggested_fix": "Check the gateway response",
+        }
+
 
 def exchange(request: bytes) -> tuple[int, dict]:
     server_socket, client_socket = socket.socketpair()
@@ -142,6 +148,14 @@ def test_proposal_route_requires_service_token():
     status, payload = post("/v1/proposals", body, "secret-token")
     assert status == 200
     assert payload["finding_id"] == body["finding_id"]
+
+
+def test_investigation_route_requires_service_token():
+    body = {"finding_id": "a" * 16, "app_id": "orders"}
+    assert post("/v1/investigations", body, "wrong") == (401, {"error": "unauthorized"})
+    status, payload = post("/v1/investigations", body, "secret-token")
+    assert status == 200
+    assert payload["evidence"]["finding_id"] == body["finding_id"]
 
 
 def test_server_requires_explicit_auth_choice(monkeypatch):

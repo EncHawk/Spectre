@@ -4,14 +4,18 @@ import hmac
 import json
 import os
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
+from uuid import uuid4
 
+from .control_db import ControlDB, InvalidInput, NotFound
 from .errors import ConfigurationError, HealerError
+from .investigation import investigate_finding
 from .repository_ingest import RepositoryRegistry
 
 _MAX_BODY_BYTES = 64 * 1024
@@ -65,6 +69,7 @@ class HealerService:
         self.capability = capability
         self.token = token
         self.settings = settings or ServerSettings()
+        self.control_db = ControlDB.from_environment()
 
     @classmethod
     def initialize(cls, settings: ServerSettings) -> HealerService:
@@ -199,6 +204,38 @@ class HealerService:
             path=self.settings.resolution_log,
         )
 
+    def investigate(self, options: dict[str, Any]) -> dict[str, Any]:
+        import healer
+
+        finding_id = str(options.get("finding_id", ""))
+        app_id = str(options.get("app_id", ""))
+        if not finding_id or not app_id:
+            raise ValueError("agent and finding are required")
+        report = self.doctor({**options, "since": "30d", "limit": 1000})
+        row = next((item for item in report["rows"] if item["finding"]["id"] == finding_id), None)
+        if row is None:
+            raise ValueError("finding was not found in this agent's observed traces")
+        run = next(
+            (item for item in report["runs"] if item["trace_id"] == row["finding"]["trace_id"]),
+            None,
+        )
+        user_id = _optional_string(options.get("user_id"))
+        full_name = _optional_string(options.get("repository"))
+        commit_sha = _optional_string(options.get("commit_sha"))
+        repo = None
+        if all((user_id, full_name, commit_sha)):
+            repo = RepositoryRegistry(self.settings.repo_registry).path_for(
+                user_id, full_name, commit_sha
+            )
+        completion = None
+        if os.getenv("OPENAI_API_KEY"):
+            provider = healer.provider(
+                "openai",
+                model=os.getenv("OPENAI_MODEL") or os.getenv("HEALER_MODEL") or "gpt-5-mini",
+            )
+            completion = provider.complete
+        return investigate_finding(row, run, repo_path=repo, complete=completion)
+
 
 def make_handler(service: HealerService) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
@@ -214,6 +251,18 @@ def make_handler(service: HealerService) -> type[BaseHTTPRequestHandler]:
                 return
             if route.path == "/readyz":
                 self._json(HTTPStatus.OK, {"status": "ready"})
+                return
+            if route.path == "/v1/whoami":
+                self._whoami()
+                return
+            if (
+                route.path == "/internal/access"
+                or route.path == "/internal/projects"
+                or route.path.startswith("/internal/projects/")
+            ):
+                if not self._internal_authorized():
+                    return
+                self._control_get(route.path)
                 return
             if not self._authorized():
                 return
@@ -235,6 +284,13 @@ def make_handler(service: HealerService) -> type[BaseHTTPRequestHandler]:
 
         def do_POST(self) -> None:
             route = urlparse(self.path)
+            if route.path == "/internal/projects" or route.path.startswith("/internal/projects/"):
+                if not self._internal_authorized():
+                    return
+                value = self._body()
+                if value is not None:
+                    self._control_post(route.path, value)
+                return
             if not self._authorized():
                 return
             if route.path not in {
@@ -243,19 +299,12 @@ def make_handler(service: HealerService) -> type[BaseHTTPRequestHandler]:
                 "/v1/repositories",
                 "/v1/example-runs",
                 "/v1/proposals",
+                "/v1/investigations",
             }:
                 self._json(HTTPStatus.NOT_FOUND, {"error": "route not found"})
                 return
-            try:
-                length = int(self.headers.get("Content-Length", "0"))
-                if length > _MAX_BODY_BYTES:
-                    self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "body too large"})
-                    return
-                value = json.loads(self.rfile.read(length) or b"{}")
-                if not isinstance(value, dict):
-                    raise TypeError("body must be a JSON object")
-            except (json.JSONDecodeError, TypeError, ValueError) as exc:
-                self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            value = self._body()
+            if value is None:
                 return
             if route.path == "/v1/scan":
                 self._scan(value)
@@ -269,6 +318,11 @@ def make_handler(service: HealerService) -> type[BaseHTTPRequestHandler]:
                     self._json(HTTPStatus.OK, service.propose(value))
                 except (HealerError, TypeError, ValueError) as exc:
                     self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            elif route.path == "/v1/investigations":
+                try:
+                    self._json(HTTPStatus.OK, service.investigate(value))
+                except (HealerError, TypeError, ValueError) as exc:
+                    self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             elif route.path == "/v1/repositories":
                 try:
                     self._json(HTTPStatus.OK, service.ingest_repository(value))
@@ -279,6 +333,132 @@ def make_handler(service: HealerService) -> type[BaseHTTPRequestHandler]:
                     self._json(HTTPStatus.OK, service.record_resolution(value))
                 except (HealerError, ValueError) as exc:
                     self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+
+        def do_DELETE(self) -> None:
+            route = urlparse(self.path)
+            if not route.path.startswith("/internal/projects/"):
+                self._json(HTTPStatus.NOT_FOUND, {"error": "route not found"})
+                return
+            if not self._internal_authorized():
+                return
+            parts = route.path.strip("/").split("/")
+            if len(parts) != 5 or parts[3] != "keys":
+                self._json(HTTPStatus.NOT_FOUND, {"error": "route not found"})
+                return
+            self._control_call(
+                lambda db: db.revoke_key(self._user_id(), parts[2], parts[4]) or {"revoked": True}
+            )
+
+        def _body(self) -> dict[str, Any] | None:
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if length < 0 or length > _MAX_BODY_BYTES:
+                    self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "body too large"})
+                    return None
+                value = json.loads(self.rfile.read(length) or b"{}")
+                if not isinstance(value, dict):
+                    raise TypeError("body must be a JSON object")
+                return value
+            except (json.JSONDecodeError, TypeError, ValueError):
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid JSON body"})
+                return None
+
+        def _user_id(self) -> str:
+            value = self.headers.get("X-Spectre-User-Id", "")
+            if not value or len(value) > 255:
+                raise InvalidInput("User identity is required")
+            return value
+
+        def _control_call(self, action: Any, *, created: bool = False) -> None:
+            db = getattr(service, "control_db", None)
+            if db is None:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE, {"error": "DATABASE_URL is not configured"}
+                )
+                return
+            try:
+                result = action(db)
+                self._json(HTTPStatus.CREATED if created else HTTPStatus.OK, result)
+            except InvalidInput as exc:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            except NotFound as exc:
+                self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+            except Exception:  # noqa: BLE001 - database errors may contain secrets
+                # Database exceptions may contain query parameters. Never echo them.
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Control database unavailable"}
+                )
+
+        def _control_get(self, path: str) -> None:
+            parts = path.strip("/").split("/")
+            if parts == ["internal", "access"]:
+                self._control_call(
+                    lambda db: {"has_active_key": db.has_active_key(self._user_id())}
+                )
+            elif parts == ["internal", "projects"]:
+                self._control_call(lambda db: {"projects": db.projects(self._user_id())})
+            elif len(parts) == 4 and parts[3] == "keys":
+                self._control_call(lambda db: {"keys": db.keys(self._user_id(), parts[2])})
+            else:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "route not found"})
+
+        def _control_post(self, path: str, body: dict[str, Any]) -> None:
+            parts = path.strip("/").split("/")
+            if parts == ["internal", "projects"]:
+                self._control_call(
+                    lambda db: {
+                        "project": db.create_project(
+                            self._user_id(),
+                            self.headers.get("X-Spectre-User-Email", ""),
+                            self.headers.get("X-Spectre-User-Name", ""),
+                            body.get("app_id", ""),
+                            body.get("name", ""),
+                        )
+                    },
+                    created=True,
+                )
+            elif len(parts) == 4 and parts[3] == "keys":
+                self._control_call(
+                    lambda db: {
+                        "api_key": db.create_key(self._user_id(), parts[2], body.get("scopes", []))
+                    },
+                    created=True,
+                )
+            else:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "route not found"})
+
+        def _whoami(self) -> None:
+            db = getattr(service, "control_db", None)
+            if db is None:
+                self._problem(HTTPStatus.SERVICE_UNAVAILABLE, "database_unavailable")
+                return
+            authorization = self.headers.get("Authorization", "")
+            key = (
+                authorization.removeprefix("Bearer ") if authorization.startswith("Bearer ") else ""
+            )
+            try:
+                identity, code = db.authenticate_with_code(key)
+            except Exception:  # noqa: BLE001 - database errors may contain secrets
+                self._problem(HTTPStatus.SERVICE_UNAVAILABLE, "database_unavailable")
+                return
+            if identity is None:
+                self._problem(HTTPStatus.UNAUTHORIZED, code or "invalid_key")
+                return
+            self._json(HTTPStatus.OK, {**identity, "server_time": datetime.now(UTC).isoformat()})
+
+        def _problem(self, status: HTTPStatus, code: str) -> None:
+            self._json(
+                status,
+                {"code": code, "requestId": str(uuid4())},
+                content_type="application/problem+json",
+            )
+
+        def _internal_authorized(self) -> bool:
+            # Internal mutations are never exposed in explicitly unauthenticated mode.
+            if not service.token:
+                self._json(HTTPStatus.FORBIDDEN, {"error": "Internal API disabled"})
+                return False
+            return self._authorized()
 
         def _scan(self, options: dict[str, Any]) -> None:
             try:
@@ -327,10 +507,16 @@ def make_handler(service: HealerService) -> type[BaseHTTPRequestHandler]:
             self.wfile.write(body)
             return False
 
-        def _json(self, status: HTTPStatus, value: dict[str, Any]) -> None:
+        def _json(
+            self,
+            status: HTTPStatus,
+            value: dict[str, Any],
+            *,
+            content_type: str = "application/json",
+        ) -> None:
             body = json.dumps(value, separators=(",", ":")).encode()
             self.send_response(status)
-            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")

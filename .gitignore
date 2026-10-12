@@ -1,4 +1,7 @@
 .env
+.env.local
+.env.production
+.env.development
 .venv/
 __pycache__/
 *.py[cod]
@@ -10,6 +13,6 @@ build/
 *.egg-info/
 .healer/
 .spectre/
-evidence/*.jsonl
-evidence/*.json
-!evidence/.gitkeep
+backend/evidence/*.jsonl
+backend/evidence/*.json
+!backend/evidence/.gitkeep

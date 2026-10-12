@@ -17,7 +17,7 @@ aws ecr get-login-password --region "$AWS_REGION" \
   | docker login --username AWS --password-stdin \
     "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
-docker build --platform linux/amd64 -t "$REPOSITORY:latest" .
+docker build --platform linux/amd64 -t "$REPOSITORY:latest" backend
 docker tag "$REPOSITORY:latest" "$IMAGE:latest"
 docker push "$IMAGE:latest"
 ```
@@ -43,7 +43,7 @@ Reconnect so the Docker group membership takes effect. The standard Amazon Linux
 
 ## 3. Configure and run
 
-Copy `deploy/ec2/compose.yaml` and `deploy/ec2/.env.example` to `/opt/spectre-healer`, rename the environment file to `.env`, and fill it using values from your secret manager. Do not commit it.
+Copy `backend/deploy/ec2/compose.yaml` and `backend/deploy/ec2/.env.example` to `/opt/spectre-healer`, rename the environment file to `.env`, and fill it using values from your secret manager. Do not commit it.
 
 ```bash
 cd /opt/spectre-healer

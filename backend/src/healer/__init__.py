@@ -11,10 +11,12 @@ from pathlib import Path
 from typing import Any
 
 from .adversarial import Fault, attack, inject_fault, variant_cases, variants
+from .adversary import ProbeResult, evolve_prompts
 from .causes import group_causes
 from .doctor import doctor, record_resolution
 from .errors import ConfigurationError
 from .fixes import apply_proposal, propose_fix
+from .investigation import investigate_finding
 from .models import (
     Capability,
     CauseGroup,
@@ -184,6 +186,7 @@ __all__ = [
     "Finding",
     "FixProposal",
     "Generation",
+    "ProbeResult",
     "Provider",
     "RegressionCase",
     "Runtime",
@@ -196,12 +199,14 @@ __all__ = [
     "attack",
     "build_report",
     "doctor",
+    "evolve_prompts",
     "findings_to_cases",
     "get_default_provider",
     "group_causes",
     "init",
     "init_runtime_for_demo",
     "inject_fault",
+    "investigate_finding",
     "open_pull_request",
     "propose_fix",
     "provider",
