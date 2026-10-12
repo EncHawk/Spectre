@@ -11,7 +11,7 @@ RUN python -m venv /opt/healer
 COPY pyproject.toml README.md ./
 COPY src ./src
 RUN /opt/healer/bin/pip install --upgrade pip \
-    && /opt/healer/bin/pip install '.[neatlogs,providers,control]'
+    && /opt/healer/bin/pip install '.[neatlogs,providers,control,lab]'
 
 FROM ${PYTHON_IMAGE} AS runtime
 
