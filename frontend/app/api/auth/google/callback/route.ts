@@ -7,10 +7,10 @@ export async function GET(request: NextRequest) {
   const saved = request.cookies.get(OAUTH_COOKIE)?.value;
   let flow: { kind: string; state: string; verifier: string };
   try { flow = JSON.parse(decrypt(saved || "")); }
-  catch { return NextResponse.redirect(`${base}/?auth_error=state`); }
+  catch { return NextResponse.redirect(`${base}/login?auth_error=state`); }
   const code = request.nextUrl.searchParams.get("code");
   const state = request.nextUrl.searchParams.get("state");
-  if (flow.kind !== "google" || !state || !equal(flow.state, state) || !code) return NextResponse.redirect(`${base}/?auth_error=state`);
+  if (flow.kind !== "google" || !state || !equal(flow.state, state) || !code) return NextResponse.redirect(`${base}/login?auth_error=state`);
   try {
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", cache: "no-store",
       headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     setSession(response, session); clearOAuth(response);
     return response;
   } catch {
-    const response = NextResponse.redirect(`${base}/?auth_error=google`);
+    const response = NextResponse.redirect(`${base}/login?auth_error=google`);
     clearOAuth(response); return response;
   }
 }

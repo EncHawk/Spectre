@@ -3,7 +3,7 @@ import { ProjectKeys } from "@/components/project-keys";
 import { redirect } from "next/navigation";
 
 export default async function SetupPage() {
-  if (!await currentUser()) redirect("/");
+  if (!await currentUser()) redirect("/login");
   return <main className="mx-auto max-w-3xl p-6 text-slate-950 md:p-12">
     <p className="text-xs font-medium uppercase tracking-widest text-blue-700">Spectre setup</p>
     <h1 className="mt-3 text-3xl font-semibold">Create a project key to enter the workspace</h1>

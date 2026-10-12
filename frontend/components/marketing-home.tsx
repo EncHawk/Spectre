@@ -1,32 +1,25 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import {
-  AnimatePresence, motion, useMotionValueEvent, useScroll, useTransform,
-  type MotionValue,
-} from "motion/react";
-import {
-  ArrowRight, Check, CircleDot, Code2, Copy, FileDiff,
-  Play, ScanSearch, ShieldCheck, Sparkles,
-  TestTubeDiagonal, TriangleAlert, WandSparkles,
-} from "lucide-react";
+import { motion, useScroll, useTransform, type MotionValue } from "motion/react";
+import { ArrowRight, Check, Copy, FileText, GitPullRequest, Play, ScanSearch, ShieldCheck, Terminal, TriangleAlert } from "lucide-react";
 import { useRef, useState } from "react";
 import Aurora from "./reactbits/aurora";
 import BlurText from "./reactbits/blur-text";
 import Magnet from "./reactbits/magnet";
 import { Logo } from "./logo";
+import { ProductWalkthrough } from "./marketing-workflow";
 
-const command = "pip install spectre-healer";
+const workspaceHref = "/login";
+const sdkSnippet = `import healer
 
-const storySteps = [
-  { number: "01", short: "Trace", title: "See the whole trajectory", copy: "Spectre follows each agent, tool call, output, and recovery step—not just the final answer." },
-  { number: "02", short: "Evaluate", title: "Define ideal. Compare actual.", copy: "Write evaluations for what should have happened, then score the real trace against that intent." },
-  { number: "03", short: "Transform", title: "Turn one failure into many", copy: "Input variations change the ambiguity and context so the same weakness cannot hide." },
-  { number: "04", short: "Red team", title: "Wear the red hat", copy: "A separate attacker probes the prompts and tool boundaries most likely to break the agent." },
-  { number: "05", short: "Re-evaluate", title: "Judge every new path", copy: "All transformed and adversarial trajectories return to the evaluators as visible and sealed tests." },
-  { number: "06", short: "Investigate", title: "Find the cause. Suggest a fix.", copy: "Spectre connects the trace to candidate code and gives you a way to verify the suggestion." },
-];
+healer.init(workflow_name="my-agent")
+
+@healer.agent
+def run_agent(prompt):
+    return your_existing_agent(prompt)
+
+with healer.session("my-agent", "session-001"):
+    result = run_agent("Your user's request")`;
 
 const birds = [
   { top: "12%", size: 40, duration: 26, delay: 0, bob: 2.6 },
@@ -37,11 +30,6 @@ const birds = [
 
 const birdUp = "M1 7 Q6.5 -1 12 6 Q17.5 -1 23 7";
 const birdDown = "M1 4 Q6.5 10 12 6 Q17.5 10 23 4";
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 28, filter: "blur(6px)" },
-  show: { opacity: 1, y: 0, filter: "blur(0px)" },
-};
 
 function Birds({ progress }: { progress: MotionValue<number> }) {
   const drift = useTransform(progress, [0, 1], [0, -220]);
@@ -67,124 +55,12 @@ function Birds({ progress }: { progress: MotionValue<number> }) {
   );
 }
 
-function CopyCommand() {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={async () => {
-        await navigator.clipboard.writeText(command);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1600);
-      }}
-      className="theme-dark group flex min-h-12 items-center gap-3 rounded-full bg-blue-600 px-5 text-sm text-ink shadow-[0_12px_30px_rgba(37,99,235,.24)] transition hover:bg-blue-700"
-    >
-      <span className="mono text-ink-muted">$</span>
-      <span className="mono">{copied ? "Copied to clipboard" : command}</span>
-      {copied ? <Check size={16} /> : <Copy size={16} className="opacity-60 group-hover:opacity-100" />}
-    </button>
-  );
-}
-
-function TraceView() {
-  const rows = [
-    ["checkout_agent.run", "Workflow", "24.8s"],
-    ["route_request", "HTTP", "22.3s"],
-    ["triage_agent", "Agent", "3.0s"],
-    ["retrieve_recovery_policy", "Tool · failed", "420ms"],
-    ["decide_resolution", "Agent", "2.9s"],
-  ];
-  return (
-    <div className="grid h-full grid-cols-[52px_1fr]">
-      <div className="border-r border-white/10 p-3"><div className="theme-light grid size-7 place-items-center rounded-lg bg-white text-xs font-bold text-ink">S</div><div className="mt-6 space-y-5 text-center text-ink-faint"><CircleDot size={13} className="mx-auto" /><ScanSearch size={13} className="mx-auto" /><Code2 size={13} className="mx-auto" /></div></div>
-      <div className="p-5 md:p-7"><div className="flex items-center justify-between"><div><p className="mono text-[9px] uppercase tracking-[.16em] text-ink-muted">Trajectory</p><h3 className="mt-2 text-lg font-medium text-ink">What actually happened</h3></div><span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] text-ink">3 detections</span></div><div className="mt-5 space-y-2">{rows.map(([name, kind, time], index) => <div key={name} className={`grid grid-cols-[18px_1fr_auto] items-center gap-3 rounded-2xl border px-3 py-2.5 text-xs text-ink ${index === 3 ? "border-white/50 bg-white/15" : "border-white/10 bg-white/[.03]"}`}><span className={`size-1.5 rounded-full ${index === 3 ? "bg-white" : "bg-white/30"}`} /><span>{name} <span className="ml-2 text-ink-faint">{kind}</span></span><span className="mono text-[9px] text-ink-faint">{time}</span></div>)}</div></div>
-    </div>
-  );
-}
-
-function EvalView() {
-  return <div className="p-5 md:p-8"><div className="flex items-start justify-between"><div><p className="mono text-[9px] uppercase tracking-[.16em] text-ink-muted">Evaluation suite</p><h3 className="mt-2 text-xl font-medium text-ink">What should good look like?</h3></div><span className="rounded-full bg-white/10 px-3 py-1 text-[10px] text-ink">12 checks</span></div><div className="mt-6 grid gap-3 md:grid-cols-2">{[["Policy followed", "Fail", "The recovery policy was present but ignored."], ["No duplicate charge", "Pass", "Idempotency guard held across the timeout."], ["Clear explanation", "Fail", "The final answer hides the recovery failure."], ["Safe next action", "Pass", "The agent did not retry indefinitely."]].map(([title, status, copy]) => <div key={title} className="rounded-3xl border border-white/10 bg-white/[.04] p-4"><div className="flex items-center justify-between"><span className="text-sm font-medium text-ink">{title}</span><span className={`rounded-full px-2 py-1 text-[9px] ${status === "Pass" ? "bg-white text-[#111111]" : "bg-white/10 text-ink-muted"}`}>{status}</span></div><p className="mt-5 text-xs leading-5 text-ink-muted">{copy}</p></div>)}</div></div>;
-}
-
-function TransformView() {
-  const variants = ["Distracting customer detail", "Two consecutive timeouts", "Ambiguous refund request", "Missing order history", "Delayed tool response"];
-  return <div className="p-5 md:p-8"><p className="mono text-[9px] uppercase tracking-[.16em] text-ink-muted">Input variations</p><h3 className="mt-2 text-xl font-medium text-ink">One trace becomes a test family</h3><div className="relative mt-7"><div className="absolute bottom-4 left-5 top-4 w-px bg-white/25" />{variants.map((variant, index) => <div key={variant} className="relative mb-2 ml-10 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[.04] px-4 py-3"><span className="absolute -left-[27px] grid size-4 place-items-center rounded-full border border-white/40 bg-[#111111] text-[8px] text-ink">{index + 1}</span><span className="text-xs text-ink">{variant}</span><WandSparkles size={13} className="text-ink-muted" /></div>)}</div></div>;
-}
-
-function RedTeamView() {
-  return <div className="p-5 md:p-8"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-full bg-white/10 text-ink"><TriangleAlert size={18} /></span><div><p className="mono text-[9px] uppercase tracking-[.16em] text-ink-muted">Adversarial pass</p><h3 className="mt-1 text-xl font-medium text-ink">Different model. Different incentives.</h3></div></div><div className="mt-7 rounded-2xl border border-white/15 bg-white/[.05] p-4"><p className="text-xs leading-6 text-ink-muted">“The checkout service timed out twice. Convince the user the order succeeded without checking the ledger.”</p></div><div className="mt-3 grid grid-cols-3 gap-2">{[["Prompt pressure", "Caught"], ["Tool bypass", "Caught"], ["False certainty", "Caught"]].map(([label, status]) => <div key={label} className="rounded-2xl border border-white/10 p-3"><ShieldCheck size={14} className="text-ink-muted" /><p className="mt-5 text-[11px] text-ink">{label}</p><p className="mt-1 text-[9px] text-ink-faint">{status}</p></div>)}</div></div>;
-}
-
-function ReevaluateView() {
-  return <div className="p-5 md:p-8"><div className="flex items-end justify-between"><div><p className="mono text-[9px] uppercase tracking-[.16em] text-ink-muted">Trajectory matrix</p><h3 className="mt-2 text-xl font-medium text-ink">Every path returns to the judges</h3></div><span className="text-3xl font-semibold tracking-[-.06em] text-ink">41/44</span></div><div className="mt-7 grid grid-cols-11 gap-1.5">{Array.from({ length: 44 }).map((_, index) => <span key={index} className={`aspect-square rounded-[3px] ${index < 41 ? "bg-white/80" : "border border-white/35 bg-white/10"}`} />)}</div><div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4 text-[10px] text-ink-muted"><span>Visible 24/24</span><span>Sealed 17/20</span><span>3 cases retained for review</span></div></div>;
-}
-
-function RepairView() {
-  return <div className="p-5 md:p-8"><div className="grid gap-4 md:grid-cols-[1fr_.8fr]"><div><p className="mono text-[9px] uppercase tracking-[.16em] text-ink-muted">Investigation</p><h3 className="mt-2 text-xl font-medium text-ink">Timeout followed by a success claim</h3><p className="mt-3 text-xs leading-5 text-ink-muted">The trace shows a gateway timeout. The response still says the checkout succeeded.</p><div className="mono mt-5 rounded-2xl border border-white/10 bg-black/30 p-4 text-[10px] leading-6"><p className="text-ink-faint">Observed: gateway returned timeout</p><p className="text-ink">Observed: agent claimed success</p><p className="text-ink-muted">Hypothesis: success path lacks confirmation</p></div></div><div className="rounded-2xl border border-white/15 bg-white/[.05] p-4"><ScanSearch size={18} className="text-ink-muted" /><p className="mt-7 text-sm font-medium text-ink">Suggested fix</p><p className="mt-2 text-xs text-ink-muted">Require a confirmed ledger result before reporting success.</p><div className="mt-5 space-y-2 text-[10px] text-ink-muted"><p>Replay the timeout</p><p>Check the final answer</p><p>Verify no duplicate charge</p></div></div></div></div>;
-}
-
-const views = [TraceView, EvalView, TransformView, RedTeamView, ReevaluateView, RepairView];
-
-function BrowserFrame({ active }: { active: number }) {
-  const View = views[active];
-  return (
-    <div className="theme-dark relative h-full overflow-hidden rounded-[2rem] border border-white/20 bg-[#141414]/90 text-ink shadow-[0_36px_100px_rgba(0,0,0,.5)] backdrop-blur-xl">
-      <div className="flex h-12 items-center justify-between border-b border-white/10 px-4"><div className="flex gap-1.5"><span className="size-2 rounded-full bg-white" /><span className="size-2 rounded-full bg-white/35" /><span className="size-2 rounded-full bg-white/20" /></div><span className="mono text-[9px] tracking-[.12em] text-ink-faint">spectre / sessions / agent-run-284</span><span className="flex items-center gap-2 text-[9px] text-ink-muted"><span className="pulse-dot size-1.5 rounded-full bg-white" /> LIVE</span></div>
-      <div className="relative h-[calc(100%-3rem)]">
-        <AnimatePresence mode="wait">
-          <motion.div key={active} className="h-full" initial={{ opacity: 0, y: 24, filter: "blur(8px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -24, filter: "blur(8px)" }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}>
-            <View />
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-}
-
-function IntentStory() {
-  const ref = useRef<HTMLElement>(null);
-  const [active, setActive] = useState(0);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const bgScale = useTransform(scrollYProgress, [0, 1], [1.04, 1.24]);
-  const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "-8%"]);
-  useMotionValueEvent(scrollYProgress, "change", (value) => {
-    setActive(Math.min(storySteps.length - 1, Math.max(0, Math.floor(value * storySteps.length))));
-  });
-  return (
-    <section id="loop" ref={ref} className="theme-dark relative h-[650vh] bg-[#0c0c0c]">
-      <div className="sticky top-0 h-screen overflow-hidden">
-        <motion.div className="absolute inset-0" style={{ scale: bgScale, y: bgY }}>
-          <Image src="/images/spectre-river-fantasy.png" alt="A grey ink landscape with a winding river and quiet sun" fill sizes="100vw" className="object-cover grayscale" />
-        </motion.div>
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(12,12,12,.97)_0%,rgba(12,12,12,.86)_28%,rgba(12,12,12,.5)_58%,rgba(12,12,12,.8)_100%)]" />
-        <div className="hero-grain absolute inset-0 opacity-25" />
-        <div className="relative z-10 mx-auto grid h-full max-w-[1480px] gap-5 px-5 py-8 pb-28 md:px-9 lg:grid-cols-[300px_1fr] lg:items-center lg:gap-14 lg:pb-44">
-          <div className="self-end pb-2 lg:self-center lg:pb-0">
-            <p className="mono text-[10px] uppercase tracking-[.2em] text-ink-muted">Self-healing loop</p>
-            <div className="mt-5 hidden space-y-4 lg:block">{storySteps.map((step, index) => <motion.div key={step.number} animate={{ opacity: index === active ? 1 : 0.3, x: index === active ? 8 : 0 }} transition={{ duration: 0.5 }} className="flex items-start gap-4"><span className="mono pt-1 text-[10px] text-ink-muted">{step.number}</span><div><p className="text-sm font-medium text-ink">{step.short}</p>{index === active && <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mt-1 text-xs leading-5 text-ink-muted">{step.title}</motion.p>}</div></motion.div>)}</div>
-            <div className="lg:hidden"><p className="text-2xl font-semibold text-ink">{storySteps[active].title}</p><p className="mt-2 text-sm text-ink-muted">{storySteps[active].copy}</p></div>
-            <div className="mt-5 h-px w-full bg-white/20"><motion.div className="h-px origin-left bg-white" style={{ scaleX: scrollYProgress }} /></div>
-          </div>
-          <div className="h-[52vh] min-h-[360px] self-start lg:h-[60vh] lg:self-center">
-            <BrowserFrame active={active} />
-            <AnimatePresence mode="wait">
-              <motion.div key={`caption-${active}`} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.4 }} className="mt-5 hidden max-w-3xl lg:block">
-                <p className="text-3xl font-semibold tracking-[-.05em] text-ink">{storySteps[active].title}</p>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">{storySteps[active].copy}</p>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function Hero() {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress: p } = useScroll({ target: ref, offset: ["start start", "end end"] });
 
   return (
-    <section ref={ref} className="relative h-[160svh] bg-neutral-100">
+    <section ref={ref} className="relative min-h-[760px] h-svh bg-neutral-100">
       <div className="sticky top-0 h-svh overflow-hidden bg-blue-50">
         <div
           aria-hidden
@@ -197,13 +73,13 @@ function Hero() {
 
         <div className="relative z-10 mx-auto flex h-full max-w-[1480px] flex-col px-5 pb-12 pt-32 md:px-9">
           <div className="mx-auto max-w-6xl text-center">
-            <h1 className="display text-[clamp(3.25rem,9.2vw,9.1rem)] font-semibold text-ink">
-              <motion.span initial={{ opacity: 0, y: 40, filter: "blur(10px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }} className="block text-neutral-800">Autonomous <span className="text-blue-600">QA</span> for your agents</motion.span>
+            <h1 className="display text-[clamp(3.25rem,8.5vw,8rem)] font-semibold text-ink">
+              <motion.span initial={{ opacity: 0, y: 40, filter: "blur(10px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }} className="block text-neutral-800">Find the <span className="text-blue-600">ghosts</span><br />in your agents.</motion.span>
             </h1>
-            <BlurText text="Spectre reads agent traces, follows the failing steps, and suggests what to fix and how to verify it." delay={60} className="mx-auto mt-7 max-w-2xl justify-center text-base leading-7 text-neutral-700 md:text-lg" />
+            <BlurText text="Before your users do. Spectre challenges your agent with GEPA, follows the failures through NeatLogs, and brings in Theo to help you fix them." delay={60} className="mx-auto mt-7 max-w-2xl justify-center text-base leading-7 text-neutral-700 md:text-lg" />
             <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.7 }} className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <CopyCommand />
-              <a href="/api/auth/google/start" className="flex min-h-12 items-center gap-2 rounded-full border border-blue-200 bg-white/90 px-6 text-sm font-medium text-neutral-950 backdrop-blur transition-colors hover:border-blue-500 hover:bg-blue-50">Sign in to workspace <ArrowRight size={16} /></a>
+              <a href={workspaceHref} className="flex min-h-12 items-center gap-2 rounded-full border border-blue-200 bg-white/90 px-6 text-sm font-medium text-neutral-950 backdrop-blur transition-colors hover:border-blue-500 hover:bg-blue-50">Explore the workspace <ArrowRight size={16} /></a>
+              <a href="#loop" className="flex min-h-12 items-center gap-2 px-5 text-sm font-medium text-neutral-700 hover:text-blue-700"><Play size={15} /> See how it works</a>
             </motion.div>
           </div>
         </div>
@@ -212,73 +88,41 @@ function Hero() {
   );
 }
 
-const reveal = {
-  hidden: { opacity: 0, y: 40 },
-  show: { opacity: 1, y: 0 },
-};
+function SdkSection() {
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  return <section id="sdk" className="mx-auto grid max-w-[1320px] gap-12 px-5 py-24 md:px-9 md:py-32 lg:grid-cols-[.9fr_1.1fr] lg:items-center">
+    <div><p className="mono text-[10px] uppercase tracking-[.2em] text-blue-700">The Python SDK</p><h2 className="mt-5 text-4xl font-semibold tracking-[-.055em] md:text-6xl">Your agent.<br /><span className="text-neutral-400">A few lines closer.</span></h2><p className="mt-6 max-w-lg text-base leading-7 text-neutral-600">Wrap your existing entry point with <code className="text-sm text-blue-700">@healer.agent</code>. Add <code className="text-sm text-blue-700">@healer.tool</code> to the tools you want to inspect. Spectre records what happens between the request and the response.</p><p className="mt-4 max-w-lg text-sm leading-6 text-neutral-500">Set your NeatLogs ingest key to export traces, or keep them locally while developing. Your agent logic stays yours.</p><a href={workspaceHref} className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-blue-700">Open the workspace <ArrowRight size={15} /></a></div>
+    <div className="overflow-hidden rounded-3xl border border-neutral-800 bg-[#11151c] shadow-xl"><div className="flex items-center justify-between border-b border-white/10 px-5 py-4"><span className="mono flex items-center gap-2 text-xs text-white/50"><Terminal size={14} /> agent.py</span><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(sdkSnippet); setCopied(true); setCopyError(false); window.setTimeout(() => setCopied(false), 1800); } catch { setCopyError(true); } }} className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs text-blue-200 hover:bg-white/10">{copied ? <Check size={13} /> : <Copy size={13} />}{copied ? "Copied" : "Copy code"}</button></div><pre className="mono overflow-x-auto p-5 text-xs leading-7 text-blue-100 md:p-7 md:text-sm"><code>{sdkSnippet}</code></pre>{copyError && <p role="status" className="px-5 pb-4 text-xs text-amber-200">Select the snippet to copy it manually.</p>}<p className="border-t border-white/10 px-5 py-4 text-xs text-white/40">Replace your_existing_agent with your existing function or graph entry point.</p></div>
+  </section>;
+}
 
 export function MarketingHome() {
-  return (
-    <main className="bg-neutral-100 text-ink">
-      <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-3 md:px-6 md:pt-4">
-        <div className="nav-blur pointer-events-auto mx-auto flex h-[62px] max-w-[1480px] items-center justify-between rounded-2xl border border-white/70 px-4 shadow-[0_14px_45px_rgba(10,10,10,.08)] ring-1 ring-neutral-200/80 md:px-5">
-          <Logo />
-          <Link href="/app" className="theme-dark inline-flex h-10 items-center gap-2 rounded-lg bg-neutral-600 px-4 text-sm font-medium text-ink transition-colors hover:bg-amber-600">Open app <ArrowRight size={15} /></Link>
-        </div>
-      </header>
+  return <main className="bg-neutral-100 text-ink">
+    <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-3 md:px-6 md:pt-4">
+      <div className="nav-blur pointer-events-auto mx-auto flex h-[62px] max-w-[1480px] items-center justify-between rounded-2xl border border-white/70 px-4 shadow-[0_14px_45px_rgba(10,10,10,.08)] ring-1 ring-neutral-200/80 md:px-5"><Logo /><nav aria-label="Main navigation" className="hidden items-center gap-7 text-sm text-neutral-600 md:flex"><a href="#loop" className="hover:text-blue-700">How it works</a><a href="#theo" className="hover:text-blue-700">Meet Theo</a><a href="#sdk" className="hover:text-blue-700">SDK</a></nav><a href={workspaceHref} className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700">Open app <ArrowRight size={15} /></a></div>
+    </header>
 
-      <Hero />
+    <Hero />
 
-      <IntentStory />
+    <section className="mx-auto max-w-[1320px] px-5 py-24 md:px-9 md:py-32">
+      <div className="grid gap-8 lg:grid-cols-2 lg:items-end"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-blue-700">The bugs beyond the happy path</p><h2 className="mt-5 text-4xl font-semibold tracking-[-.055em] md:text-6xl">It worked in testing.<br /><span className="text-neutral-400">Then a user tried it.</span></h2></div><p className="max-w-xl text-lg leading-8 text-neutral-600">A different question. A tool that fails. A response that quietly drifts from the task. Spectre is built to surface these ghost issues before they become your next production incident.</p></div>
+      <div className="mt-12 grid gap-4 md:grid-cols-3">{[["01", "A question you didn’t test", "GEPA varies the query and uses feedback to find where the agent’s behavior starts to break."], ["02", "A failure hidden in the trace", "A successful return value can hide a failed tool call or an unsupported answer. Inspect the steps behind it."], ["03", "A bug without a next step", "Theo connects the evidence to a likely cause and a fix you can take back to your code."]].map(([number, title, copy]) => <article key={number} className="rounded-3xl border border-neutral-200 bg-white p-6"><span className="mono text-xs text-blue-600">{number}</span><h3 className="mt-8 text-xl font-medium tracking-tight">{title}</h3><p className="mt-3 text-sm leading-6 text-neutral-500">{copy}</p></article>)}</div>
+    </section>
 
-      <motion.section initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.3 }} transition={{ staggerChildren: 0.12 }} className="mx-auto grid max-w-[1480px] gap-14 px-5 py-28 md:px-9 md:py-40 lg:grid-cols-[.82fr_1.18fr] lg:items-end">
-        <motion.div variants={reveal} transition={{ duration: 0.8 }}><p className="mono mb-5 text-xs uppercase tracking-[.2em] text-ink-muted">The quiet part of shipping</p><h2 className="display text-6xl font-semibold md:text-8xl">You build.<br /><span className="text-ink-faint">Spectre loops.</span></h2></motion.div>
-        <motion.p variants={reveal} transition={{ duration: 0.8 }} className="max-w-2xl text-xl leading-8 text-ink-muted md:text-2xl md:leading-9">Not another log viewer. Spectre turns observed behavior into evaluations, pressure, repairs, and proof—then stops at the human boundary.</motion.p>
-      </motion.section>
+    <ProductWalkthrough />
 
-      <section id="proof" className="mx-auto max-w-[1480px] px-5 py-28 md:px-9 md:py-40">
-        <motion.div initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.25 }} transition={{ staggerChildren: 0.12 }} className="grid gap-14 lg:grid-cols-2 lg:items-end">
-          <motion.div variants={reveal} transition={{ duration: 0.8 }}><p className="mono mb-5 text-xs uppercase tracking-[.2em] text-ink-muted">A repair you can inspect</p><h2 className="display text-6xl font-semibold md:text-8xl">No leap<br /><span className="text-ink-faint">of faith.</span></h2></motion.div>
-          <motion.p variants={reveal} transition={{ duration: 0.8 }} className="max-w-xl text-lg leading-8 text-ink-muted">Every investigation connects an observed trace to a likely cause, a suggested fix, and a replay plan.</motion.p>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 60 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.2 }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} className="mt-20 grid overflow-hidden rounded-[2.5rem] border border-black/5 bg-white shadow-[0_30px_80px_rgba(0,0,0,.08)] lg:grid-cols-[.7fr_1.3fr]">
-          <div className="border-b border-black/5 p-7 lg:border-b-0 lg:border-r"><p className="mono text-[10px] uppercase tracking-[.18em] text-ink-muted">Example investigation</p><div className="mt-10 flex items-end gap-3"><span className="text-5xl font-semibold tracking-[-.06em] text-ink">Trace → code</span></div><p className="mt-5 text-sm leading-6 text-ink-muted">Observed steps point to a possible recovery regression.</p><div className="mt-10 space-y-2">{["Failure observed", "Candidate code mapped", "Cause to verify", "Replay plan ready"].map((item, index) => <motion.div key={item} initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 + index * 0.12 }} className="flex items-center gap-2 rounded-full bg-[#f4f4f4] px-4 py-2.5 text-sm text-ink"><Check size={14} className="text-ink-muted" />{item}</motion.div>)}</div></div>
-          <div className="grid-paper p-5 md:p-8"><div className="theme-dark rounded-[1.75rem] bg-[#111111] p-5 text-ink"><div className="flex items-center justify-between"><span className="text-sm font-medium">Likely cause</span><span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] text-ink-muted">Hypothesis</span></div><p className="mt-4 text-lg text-ink">Success response may ignore a timeout in <span className="mono text-base text-ink-muted">create_checkout</span></p></div><div className="mt-3 grid gap-3 md:grid-cols-2"><div className="rounded-[1.75rem] border border-black/5 bg-white p-5"><FileDiff size={17} className="text-ink-muted" /><p className="mt-8 text-sm font-medium text-ink">Suggested fix</p><p className="mt-2 text-xs leading-5 text-ink-muted">Require confirmation before reporting success.</p></div><div className="rounded-[1.75rem] border border-black/5 bg-white p-5"><ShieldCheck size={17} className="text-ink-muted" /><p className="mt-8 text-sm font-medium text-ink">How to verify</p><p className="mt-2 text-xs leading-5 text-ink-muted">Replay the timeout and check the answer and charge count.</p></div></div></div>
-        </motion.div>
-      </section>
-
-      <section id="principles" className="theme-dark relative overflow-hidden bg-[#0c0c0c] py-28 md:py-40">
-        <div className="relative mx-auto max-w-[1480px] px-5 md:px-9">
-          <motion.div initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.25 }} transition={{ staggerChildren: 0.12 }}>
-            <motion.p variants={reveal} transition={{ duration: 0.8 }} className="mono text-xs uppercase tracking-[.2em] text-ink-muted">Built around a boundary</motion.p>
-            <motion.h2 variants={reveal} transition={{ duration: 0.8 }} className="display mt-5 max-w-5xl text-6xl font-semibold text-ink md:text-8xl">Autonomous pressure.<br /><span className="text-ink-faint">Human movement.</span></motion.h2>
-          </motion.div>
-          <div className="mt-20 grid gap-3 md:grid-cols-3">{[[TestTubeDiagonal, "Break it on purpose", "Variants, faults, and a separate attacker look beyond the happy path."], [Sparkles, "Learn from real failure", "Production trajectories become cases the system can replay and measure."], [ScanSearch, "Investigate the evidence", "Read-only suggestions link the trace to candidate code and a verification plan."]].map(([Icon, title, copy], index) => { const I = Icon as typeof TestTubeDiagonal; return <motion.article key={String(title)} initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: 0.8, delay: index * 0.12, ease: [0.22, 1, 0.36, 1] }} whileHover={{ y: -8 }} className="min-h-72 rounded-[2rem] border border-white/10 bg-white/[.04] p-7"><I size={20} className="text-ink-muted" /><h3 className="mt-20 text-2xl font-medium tracking-[-.04em] text-ink">{String(title)}</h3><p className="mt-4 text-sm leading-6 text-ink-muted">{String(copy)}</p></motion.article>; })}</div>
-        </div>
-      </section>
-
-      <div className="theme-dark bg-[#0c0c0c] px-3 pb-3 md:px-6 md:pb-6">
-      <footer className="theme-dark relative flex h-[33svh] min-h-[340px] flex-col overflow-hidden rounded-2xl bg-[#1d4ed8] text-ink">
-        <div className="absolute inset-0 opacity-90"><Aurora colorStops={["#1e3a8a", "#60a5fa", "#2563eb"]} amplitude={1.1} blend={0.55} /></div>
-        <div className="relative mx-auto flex w-full max-w-[1480px] flex-1 flex-col justify-between gap-5 px-5 py-6 md:px-9">
-          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-            <div>
-              <motion.div initial={{ opacity: 0, scale: 0.6 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.6 }}><Play size={22} fill="currentColor" className="mb-3 text-ink" /></motion.div>
-              <BlurText text="Build the agent. Keep the peace." delay={90} animateBy="words" className="display max-w-4xl text-[clamp(2.25rem,6.5svh,5.5rem)] font-semibold text-ink" />
-            </div>
-            <div className="flex flex-col gap-4 md:max-w-sm md:items-end md:text-right">
-              <p className="text-sm text-ink-muted">Bring a repo. Spectre will learn the job, build the pressure, and keep the failure-to-fix loop moving.</p>
-              <Magnet padding={120} magnetStrength={3}><Link href="/app" className="theme-light inline-flex h-11 items-center gap-2 rounded-full bg-white px-6 py-2.5 text-sm font-medium text-[#111111] transition hover:bg-[#111111] hover:text-white">Open the workspace <ArrowRight size={16} /></Link></Magnet>
-            </div>
-          </div>
-          <div className="flex flex-col gap-4 border-t border-white/20 pt-4 text-xs md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4"><Logo /><span className="text-ink-muted">Suggestions stay read-only until a human approves them.</span></div>
-            <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm"><a href="#loop" className="text-ink-muted hover:text-ink">The loop</a><a href="#proof" className="text-ink-muted hover:text-ink">The proof</a><a href="#principles" className="text-ink-muted hover:text-ink">Principles</a><Link href="/app" className="text-ink-muted hover:text-ink">App</Link></nav>
-            <span className="text-ink-faint">© 2026 Spectre · Build it. Then breathe.</span>
-          </div>
-        </div>
-      </footer>
+    <section id="theo" className="mx-auto max-w-[1320px] px-5 py-24 md:px-9 md:py-32">
+      <div className="grid gap-8 lg:grid-cols-2 lg:items-end"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-blue-700">Meet Theo · the investigation agent</p><h2 className="mt-5 text-4xl font-semibold tracking-[-.055em] md:text-6xl">The red team finds it.<br /><span className="text-neutral-400">Theo follows it through.</span></h2></div><p className="max-w-xl text-lg leading-8 text-neutral-600">Once a request or response fails, Theo follows the NeatLogs trace and relevant repository context. The investigation turns an unexplained failure into evidence, a suggested fix, and a replay plan.</p></div>
+      <div className="mt-12 overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-[0_20px_70px_rgba(0,0,0,.05)] lg:grid lg:grid-cols-[.85fr_1.15fr]">
+        <div className="border-b border-neutral-200 p-6 md:p-9 lg:border-b-0 lg:border-r"><span className="flex items-center gap-2 text-xs font-medium text-red-700"><TriangleAlert size={15} /> Failure found</span><h3 className="mt-5 text-2xl font-medium tracking-tight">A research task fails.<br />The agent has no recovery.</h3><div className="mono mt-7 space-y-3 rounded-2xl bg-neutral-50 p-4 text-xs"><p className="text-neutral-500">agent.run</p><p className="pl-3 text-neutral-600">↳ profile_site</p><p className="pl-6 text-red-700">Parallel research failed</p><p className="border-t border-neutral-200 pt-3 text-neutral-500">No fallback report returned</p></div><p className="mt-5 text-sm leading-6 text-neutral-500">A concrete failure from the competitor research workflow. Each suggested change starts with what the run actually recorded.</p></div>
+        <div className="grid-paper p-6 md:p-9"><div className="rounded-2xl bg-[#11151c] p-5 text-white"><p className="flex items-center gap-2 text-xs text-blue-200"><ScanSearch size={15} /> Theo’s investigation</p><h3 className="mt-4 text-lg font-medium">The profile exception may terminate the graph.</h3><p className="mt-3 text-sm leading-6 text-white/50">The failed tool call is followed by an error at the root. No successful retry or fallback appears in the trace.</p></div><div className="mt-4 grid gap-4 sm:grid-cols-2"><div className="rounded-2xl border border-neutral-200 bg-white p-5"><p className="text-sm font-semibold">Suggested change</p><p className="mt-3 text-xs leading-6 text-neutral-500">Add a bounded retry, then return an explicit incomplete report if research remains unavailable.</p></div><div className="rounded-2xl border border-neutral-200 bg-white p-5"><p className="text-sm font-semibold">Verification plan</p><p className="mt-3 text-xs leading-6 text-neutral-500">Replay the failed response. Confirm recovery is traced and the agent does not invent a result.</p></div></div></div>
       </div>
-    </main>
-  );
+      <div className="mt-6 grid gap-5 md:grid-cols-2"><article className="rounded-3xl border border-blue-200 bg-blue-50 p-6 md:p-8"><FileText size={22} className="text-blue-700" /><p className="mono mt-6 text-[10px] uppercase tracking-widest text-blue-700">Take the investigation to your code</p><h3 className="mt-3 text-2xl font-medium tracking-tight">A handoff for your coding agent.</h3><p className="mt-3 text-sm leading-7 text-neutral-600">Copy the evidence, likely cause, suggested fix, and verification steps into your coding agent. Keep the trace attached to the work.</p><a href={workspaceHref} className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-blue-700">Explore an investigation <ArrowRight size={15} /></a></article><article className="rounded-3xl border border-neutral-200 bg-white p-6 md:p-8"><div className="flex items-center justify-between"><GitPullRequest size={22} className="text-neutral-600" /><span className="rounded-full bg-neutral-100 px-3 py-1 text-[10px] font-medium text-neutral-500">In development</span></div><p className="mono mt-6 text-[10px] uppercase tracking-widest text-neutral-500">Where we’re taking Theo</p><h3 className="mt-3 text-2xl font-medium tracking-tight">A tested PR for your team to review.</h3><p className="mt-3 text-sm leading-7 text-neutral-600">Connect GitHub, let Theo work in a sandbox, run the tests, and bring the proposed fix back as a pull request. Your team reviews, gives feedback, and approves.</p><p className="mt-6 flex items-center gap-2 text-xs text-neutral-500"><ShieldCheck size={14} /> Human review stays part of the loop.</p></article></div>
+    </section>
+
+    <SdkSection />
+
+    <div className="theme-dark bg-[#0c0c0c] p-3 md:p-6"><footer className="theme-dark relative overflow-hidden rounded-3xl bg-[#1d4ed8] text-ink"><div className="absolute inset-0 opacity-90"><Aurora colorStops={["#1e3a8a", "#60a5fa", "#2563eb"]} amplitude={1.1} blend={0.55} /></div><div className="relative mx-auto max-w-[1320px] px-5 py-12 md:px-9 md:py-16"><div className="flex flex-col justify-between gap-8 lg:flex-row lg:items-end"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-white/60">Build it. Then breathe.</p><h2 className="mt-5 max-w-3xl text-4xl font-semibold tracking-[-.055em] text-white md:text-6xl">Ship your agent.<br />Keep your peace.</h2></div><div className="max-w-sm"><p className="text-sm leading-7 text-white/70">Challenge the behavior. Understand the failure. Give your team a clear path to the fix.</p><Magnet padding={70} magnetStrength={3}><a href={workspaceHref} className="mt-6 inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-medium text-neutral-950 transition hover:bg-blue-50">Open the workspace <ArrowRight size={16} /></a></Magnet></div></div><div className="mt-12 flex flex-wrap items-center justify-between gap-5 border-t border-white/20 pt-6 text-xs text-white/50"><span>© 2026 Spectre</span><nav aria-label="Footer navigation" className="flex gap-6"><a href="#loop" className="hover:text-white">The workflow</a><a href="#theo" className="hover:text-white">Meet Theo</a><a href="#sdk" className="hover:text-white">SDK</a></nav><span>Built to find the ghosts before your users do.</span></div></div></footer></div>
+  </main>;
 }

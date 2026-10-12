@@ -136,7 +136,8 @@ def run():
         env = dict(os.environ, SPECTRE_PUBLIC_URL=base, SPECTRE_DB_PATH=str(database),
                    SPECTRE_ENCRYPTION_KEY="ab" * 32, HEALER_API_URL=f"http://127.0.0.1:{api_port}",
                    SPECTRE_ALLOWED_EMAILS="dev@example.com,other@example.com",
-                   HEALER_SERVER_TOKEN="test-service-token")
+                   HEALER_SERVER_TOKEN="test-service-token", GOOGLE_OAUTH_CLIENT_ID="test-client",
+                   GOOGLE_OAUTH_CLIENT_SECRET="test-secret")
         process = subprocess.Popen(["npm", "run", "start", "--", "-p", str(app_port)], cwd=ROOT,
                                    env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         try:
@@ -177,10 +178,15 @@ def run():
                 except urllib.error.URLError:
                     time.sleep(0.1)
             else: raise AssertionError("Next server did not start")
-            assert request("/api/auth/google/start")[0] == 503
-            assert 'href="/api/auth/google/start"' in page("/")[2]
-            assert page("/app")[:2] == (307, "/")
-            assert page("/setup")[:2] == (307, "/")
+            google_start = page("/api/auth/google/start")
+            assert google_start[0] == 307 and google_start[1].startswith("https://accounts.google.com/o/oauth2/v2/auth?")
+            assert f"redirect_uri={base.replace(':', '%3A').replace('/', '%2F')}%2Fapi%2Fauth%2Fgoogle%2Fcallback" in google_start[1]
+            assert 'href="/login"' in page("/")[2]
+            assert 'href="/api/auth/google/start"' in page("/login")[2]
+            assert page("/app")[:2] == (307, "/login")
+            assert page("/app/investigation")[:2] == (307, "/login")
+            assert page("/setup")[:2] == (307, "/login")
+            assert page("/api/auth/demo")[0] == 404
             token = "integration-session"
             other_token = "other-session"
             # A cookie-bearing request initializes the control-plane schema.
@@ -194,7 +200,8 @@ def run():
                 db.execute("INSERT INTO repositories(user_id,full_name,default_branch,commit_sha,file_count,indexed_at,files_json) VALUES(?,?,?,?,?,?,?)",
                            ("google-sub-1", "example/agent", "main", "b" * 40, 1, "2026-10-12T00:00:00Z", '[{"path":"agent.py","size":12}]'))
             assert request("/api/me", token=token)[1]["user"]["email"] == "dev@example.com"
-            assert page("/app", "expired-session")[:2] == (307, "/")
+            assert page("/app", "expired-session")[:2] == (307, "/login")
+            assert page("/login", token)[:2] == (307, "/app")
             assert page("/app", token)[0] == 200
             assert page("/app/investigation", token)[0] == 200
             assert page("/setup", token)[0] == 200
